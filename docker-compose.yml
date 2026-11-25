@@ -1,10 +1,7 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:16-alpine
     container_name: t-rent-db
-    restart: unless-stopped
     environment:
       POSTGRES_USER: trent
       POSTGRES_PASSWORD: trent_password
@@ -12,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U trent -d t_rent"]
       interval: 5s
@@ -20,4 +17,4 @@ services:
       retries: 5
 
 volumes:
-  postgres_data:
+  pgdata:

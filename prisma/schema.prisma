@@ -30,8 +30,9 @@ enum Availability {
 }
 
 enum BookingStatus {
-  OPEN      // Открыто
-  CLOSED    // Закрыто
+  OPEN      // Открыто / ожидает подтверждения
+  CONFIRMED // Подтверждено арендодателем
+  CLOSED    // Закрыто (завершено)
   CANCELLED // Расторгнуто
 }
 
@@ -55,6 +56,7 @@ model User {
   is_blacklisted Boolean   @default(false)
   is_blocked     Boolean   @default(false)
   rating         Decimal?  @db.Decimal(3, 2)
+  is_verified    Boolean   @default(false)
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
 
@@ -69,6 +71,8 @@ model User {
   blacklists_as_lesser BlackList[]      @relation("BlackListLesser")
   blacklists_as_renter BlackList[]      @relation("BlackListRenter")
   notifications        Notification[]  @relation("NotificationOwner")
+  refresh_tokens       RefreshToken[]
+  viewed_rentals       ViewedRental[]
 
   @@map("users")
 }
@@ -94,7 +98,7 @@ model Rental {
   area             Decimal         @db.Decimal(10, 2)
   price            Decimal         @db.Decimal(12, 2)
   time_measurement TimeMeasurement @default(HOUR)
-  photo_url        String?
+  photo_url        String?         // главное фото (legacy / preview)
   availability     Availability    @default(FREE)
   desc             String?
   amount_of_people Int             @default(1)
@@ -107,21 +111,38 @@ model Rental {
   bookings  Booking[]
   reviews   ReviewOfRental[]
   favorites Favorite[]
+  photos    Photo[]
+  viewed_by ViewedRental[]
 
   @@map("rentals")
 }
 
+model Photo {
+  photo_id   Int      @id @default(autoincrement())
+  rental_id  Int
+  url        String
+  sort_order Int      @default(0)
+  created_at DateTime @default(now())
+
+  rental Rental @relation(fields: [rental_id], references: [rental_id], onDelete: Cascade)
+
+  @@map("photos")
+}
+
 model Booking {
-  booking_id  Int           @id @default(autoincrement())
-  owner_id    Int           // Арендодатель
-  booker_id   Int           // Арендатор
-  rental_id   Int
-  start_date  DateTime
-  end_date    DateTime
-  status      BookingStatus @default(OPEN)
-  total_price Decimal       @db.Decimal(12, 2)
-  created_at  DateTime      @default(now())
-  updated_at  DateTime      @updatedAt
+  booking_id      Int           @id @default(autoincrement())
+  owner_id        Int           // Арендодатель
+  booker_id       Int           // Арендатор
+  rental_id       Int
+  start_date      DateTime
+  end_date        DateTime
+  status          BookingStatus @default(OPEN)
+  total_price     Decimal       @db.Decimal(12, 2)
+  deposit_amount  Decimal?      @db.Decimal(12, 2)
+  guests_count    Int           @default(1)
+  comment         String?
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
 
   // Relations
   owner  User   @relation("BookingOwner", fields: [owner_id], references: [user_id])
@@ -166,8 +187,8 @@ model Favorite {
   rental_id   Int
   user_id     Int
 
-  rental Rental @relation(fields: [rental_id], references: [rental_id])
-  user   User   @relation(fields: [user_id], references: [user_id])
+  rental Rental @relation(fields: [rental_id], references: [rental_id], onDelete: Cascade)
+  user   User   @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@unique([user_id, rental_id])
   @@map("favorites")
@@ -206,10 +227,36 @@ model Notification {
   owner_id        Int
   status          NotificationStatus @default(INFO)
   comment         String?
+  is_read         Boolean            @default(false)
   created_at      DateTime           @default(now())
   updated_at      DateTime           @updatedAt
 
-  owner User @relation("NotificationOwner", fields: [owner_id], references: [user_id])
+  owner User @relation("NotificationOwner", fields: [owner_id], references: [user_id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+model RefreshToken {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  token      String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model ViewedRental {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  rental_id  Int
+  viewed_at  DateTime @default(now())
+
+  user   User   @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  rental Rental @relation(fields: [rental_id], references: [rental_id], onDelete: Cascade)
+
+  @@unique([user_id, rental_id])
+  @@map("viewed_rentals")
 }
