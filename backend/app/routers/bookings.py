@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from decimal import Decimal
 from app.database import db
 from app.dependencies import get_current_user, require_renter, require_lesser
-from app.schemas.booking import BookingCreate, BookingStatusUpdate, BookingOut
+from app.schemas.booking import BookingCreate, BookingStatusUpdate
 from app.schemas.common import MessageResponse
 from prisma.models import User
 
@@ -24,17 +24,29 @@ def _calc_price(rental, start: datetime, end: datetime) -> Decimal:
 
 
 @router.post("", status_code=201)
-async def create_booking(body: BookingCreate, user: User = Depends(require_renter)):
+async def create_booking(
+    body: BookingCreate,
+    user: User = Depends(require_renter)
+):
     if body.end_date <= body.start_date:
-        raise HTTPException(status_code=400, detail="Дата окончания должна быть позже начала")
+        raise HTTPException(
+            status_code=400,
+            detail="Дата окончания должна быть позже начала"
+        )
 
     rental = await db.rental.find_unique(where={"rental_id": body.rental_id})
     if not rental:
         raise HTTPException(status_code=404, detail="Объявление не найдено")
     if rental.availability != "FREE":
-        raise HTTPException(status_code=400, detail="Помещение сейчас недоступно")
+        raise HTTPException(
+            status_code=400,
+            detail="Помещение сейчас недоступно"
+        )
     if rental.owner_id == user.user_id:
-        raise HTTPException(status_code=400, detail="Нельзя бронировать своё объявление")
+        raise HTTPException(
+            status_code=400,
+            detail="Нельзя бронировать своё объявление"
+        )
 
     # Проверка ЧС
     in_bl = await db.blacklist.find_first(
@@ -45,7 +57,10 @@ async def create_booking(body: BookingCreate, user: User = Depends(require_rente
         }
     )
     if in_bl:
-        raise HTTPException(status_code=403, detail="Вы в чёрном списке арендодателя")
+        raise HTTPException(
+            status_code=403,
+            detail="Вы в чёрном списке арендодателя"
+        )
 
     # Race condition protection: проверяем пересечения
     overlapping = await db.booking.find_first(
@@ -57,7 +72,10 @@ async def create_booking(body: BookingCreate, user: User = Depends(require_rente
         }
     )
     if overlapping:
-        raise HTTPException(status_code=409, detail="Выбранный период уже занят")
+        raise HTTPException(
+            status_code=409,
+            detail="Выбранный период уже занят"
+        )
 
     if body.guests_count > rental.amount_of_people:
         raise HTTPException(

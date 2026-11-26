@@ -14,10 +14,11 @@ function CategoryFilter({
     return (
         <div className="category-filter">
             <button
+                type="button"
                 className={
                     selectedCategory === "all"
                         ? "category-chip category-chip--all active"
-                        : "category-chip category-chip-all"
+                        : "category-chip category-chip--all"
                 }
                 onClick={() => onSelect("all")}
             >
@@ -26,6 +27,7 @@ function CategoryFilter({
 
             {categories.map((category, index) => (
                 <button
+                    type="button"
                     key={category.category_id}
                     className={[
                         "category-chip",

@@ -9,7 +9,7 @@ export default function HomePage() {
             <h1>Подходящее место</h1>
 
             <p className="eyebrow">Лофты, студии и кабинеты - арендуйте на несколько часов, а не на целый день</p>
-            <Link to="/rentals" className="button button-primary">
+            <Link to="/rentals" className="button button--primary">
                 Посмотреть объявления
             </Link>
         </section>

@@ -1,40 +1,48 @@
 import { api } from "./axios";
-import type { Rental, TimeMeasurement, RentalAvailability } from "../types/rental.types";
+import type { Rental, RentalListResponse, Category } from "../types/rental.types";
 
-export interface RentalCreateRequest {
-    title: string;
-    address: string;
-    area: number;
-    price: number;
-    time_measurement: TimeMeasurement;
-    category_id?: number | null;
-    desc?: string | null;
-    amount_of_people: number;
-    photo_url?: string | null;
-    availability?: RentalAvailability;
+export interface RentalFilters {
+    category_id?: number;
+
+    search?: string;
+    city?: string;
+
+    min_price?: number;
+    max_price?: number;
+    min_area?: number;
+    min_guests?: number;
+
+    start_at?: string;
+    end_at?: string;
+
+    availability?: "FREE" | "BUSY" | "TEMP_CLOSED";
+
+    sort_by?: "newest" | "price_asc" | "price_desc";
+
+    skip?: number;
+    take?: number;
 }
 
-export const getRentals = async(): Promise<Rental[]> => {
-    const response = await api.get<Rental[]>("/rentals");
-    return response.data;
-};
+export async function getRentals(
+    filters: RentalFilters = {}
+): Promise<RentalListResponse> {
+    const response = await api.get<RentalListResponse>("/rentals", {
+        params: filters,
+    });
 
-export const getRentalById = async (
-    id: number
-): Promise<Rental> => {
-    const response = await api.get<Rental>(`/rentals/${id}`);
     return response.data;
-};
+}
 
-export const createRental = async (
-    data: RentalCreateRequest
-): Promise<Rental> => {
-    const response = await api.post<Rental>("/rentals", data);
+export async function getRentalById(
+    rentalId: number
+): Promise<Rental> {
+    const response = await api.get<Rental>(`/rentals/${rentalId}`);
+
     return response.data;
-};
+}
 
-export const getCategories = async () => {
-    const response = await api.get('/categories');
+export async function getCategories(): Promise<Category[]> {
+    const response = await api.get<Category[]>("/categories");
+
     return response.data;
-};
-
+}

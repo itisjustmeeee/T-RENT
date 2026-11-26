@@ -1,21 +1,77 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+
+import type { RentalFilters } from "../../api/rentals.api";
 
 interface HeroProps {
-    onSearch: (value: string) => void;
+    onSearch: (filters: RentalFilters) => void;
 }
 
 function Hero({ onSearch }: HeroProps) {
     const [search, setSearch] = useState("");
+    const [city, setCity] = useState("");
+    const [date, setDate] = useState("");
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const [startTime, setStartTime] = useState("14:00");
+    const [endTime, setEndTime] = useState("18:00");
+
+    const [guests, setGuests] = useState(1);
+
+    const [error, setError] = useState("");
+
+    const today = new Date();
+
+    const minDate = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, "0"),
+        String(today.getDate()).padStart(2, "0"),
+    ].join("-");
+
+    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        onSearch(search);
+        setError("");
+
+        const filters: RentalFilters = {
+            search: search.trim() || undefined,
+            city: city.trim() || undefined,
+            min_guests: guests,
+        };
+
+        if (date) {
+            if (!startTime || !endTime) {
+                setError("Укажите время начала и окончания");
+                return;
+            }
+
+            const start = new Date(
+                `${date}T${startTime}:00`
+            );
+
+            const end = new Date(
+                `${date}T${endTime}:00`
+            );
+
+            if (
+                Number.isNaN(start.getTime()) ||
+                Number.isNaN(end.getTime()) ||
+                end <= start
+            ) {
+                setError(
+                    "Время окончания должно быть позже начала"
+                );
+                return;
+            }
+
+            filters.start_at = start.toISOString();
+            filters.end_at = end.toISOString();
+        }
+
+        onSearch(filters);
     };
 
     return (
         <section className="hero">
             <div className="container hero__content">
-                <p>
+                <p className="hero__label">
                     ДЛЯ РАБОТЫ, ВСТРЕЧ И ВДОХНОВЕНИЯ
                 </p>
 
@@ -32,41 +88,98 @@ function Hero({ onSearch }: HeroProps) {
                 </p>
 
                 <form
-                    className="hero__search"
+                    className="hero__form"
                     onSubmit={handleSubmit}
                 >
-                    <input
-                        type="text"
-                        placeholder="Найти помещение..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
+                    <div className="hero__search">
+                        <input
+                            type="text"
+                            placeholder="Что вы ищете?"
+                            value={search}
+                            onChange={(e) =>
+                                setSearch(e.target.value)
+                            }
+                        />
+                        <button
+                            type="submit"
+                            className="button button--primary"
+                        >
+                            Найти
+                        </button>
+                    </div>
+                    <div className="hero__filters">
+                        <label className="hero__filter">
+                            <span>Город</span>
 
-                    <button
-                        type="submit"
-                        className="button button--primary"
-                    >
-                        Найти
-                    </button>
+                            <input
+                                type="text"
+                                placeholder="Москва, Владимир, ..."
+                                value={city}
+                                onChange={(e) =>
+                                    setCity(e.target.value)
+                                }
+                            />
+                        </label>
+                        <label className="hero__filter">
+                            <span>Дата</span>
+
+                            <input
+                                type="date"
+                                value={date}
+                                min={minDate}
+                                onChange={(e) =>
+                                    setDate(e.target.value)
+                                }
+                            />
+                        </label>
+                        <div className="hero__filter hero__time">
+                            <span>Время</span>
+
+                            <div className="hero__time-inputs">
+
+                                <input
+                                    type="time"
+                                    value={startTime}
+                                    onChange={(e) =>
+                                        setStartTime(e.target.value)
+                                    }
+                                    aria-label="Начало аренды"
+                                />
+
+                                <span>—</span>
+
+                                <input
+                                    type="time"
+                                    value={endTime}
+                                    onChange={(e) =>
+                                        setEndTime(e.target.value)
+                                    }
+                                    aria-label="Окончание аренды"
+                                />
+                            </div>
+                        </div>
+                        <label className="hero__filter">
+                            <span>Гости</span>
+
+                            <input
+                                type="number"
+                                min="1"
+                                max="1000"
+                                value={guests}
+                                onChange={(e) =>
+                                    setGuests(
+                                        Math.max(1, Number(e.target.value))
+                                    )
+                                }
+                            />
+                        </label>
+                    </div>
+                    {error && (
+                        <p className="hero__error">
+                            {error}
+                        </p>
+                    )}
                 </form>
-                <div className="hero__filters">
-                    <div className="hero__filter">
-                        <span>Город</span>
-                        <strong>Москва</strong>
-                    </div>
-                    <div className="hero__filter">
-                        <span>Дата</span>
-                        <strong>Выберите дату</strong>
-                    </div>
-                    <div className="hero__filter">
-                        <span>Время</span>
-                        <strong>Любое время</strong>
-                    </div>
-                    <div className="hero__filter">
-                        <span>Гости</span>
-                        <strong>До 12 человек</strong>
-                    </div>
-                </div>
                 <p className="hero__hint">
                     Без звонков и долгих согласований.
                     Выберите место в удобное время.

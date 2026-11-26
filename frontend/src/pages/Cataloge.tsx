@@ -1,221 +1,404 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import Hero from "../components/rentals/Hero";
 import CategoryFilter from "../components/rentals/CategoryFilter";
 import { RentalCard } from "../components/rentals/RentalCard";
 
-import { getRentals } from "../api/rentals.api";
+import axios from "axios";
 
-import type { Rental, Category, TimeMeasurement } from "../types/rental.types";
+import { 
+    getRentals,
+    getCategories,
+} from "../api/rentals.api";
+
+import type { 
+    Rental,
+    Category,
+} from "../types/rental.types";
+
+import type { RentalFilters } from "../api/rentals.api";
+
+const PAGE_SIZE = 9;
 
 function CatalogPage() {
     const navigate = useNavigate();
 
     const [rentals, setRentals] = useState<Rental[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
+
+    const [total, setTotal] = useState(0);
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    const [searchQuery, setSearchQuery] = useState("");
+    const [categoryId, setCategoryId] =
+        useState<number | "all">("all");
 
-    const [selectedCategory, setSelectedCategory] = useState<number | "all">("all");
+    const [filters, setFilters] = useState<RentalFilters>({
+        sort_by: "newest",
+        skip: 0,
+        take: PAGE_SIZE,
+    });
 
-    const [selectedTime, setSelectedTime] = useState<TimeMeasurement | "ALL">("ALL");
+    const [minPriceInput, setMinPriceInput] = useState("");
+    const [maxPriceInput, setMaxPriceInput] = useState("");
 
-    const [sort, setSort] = useState("popular");
+    const [priceError, setPriceError] = useState("");
+
+    const [heroKey, setHeroKey] = useState(0);
+
+    const currentPage =
+        Math.floor((filters.skip ?? 0) / PAGE_SIZE) + 1;
+
+    const totalPages = Math.max(
+        1,
+        Math.ceil(total / PAGE_SIZE)
+    );
 
     useEffect(() => {
+        let active = true;
+
+        async function loadCategories() {
+            try {
+                const data = await getCategories();
+
+                if (active) {
+                    setCategories(data);
+                }
+            } catch (err) {
+                console.error("Ошибка загрузки категорий:", err);
+            }
+        }
+
+        loadCategories();
+
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+
         async function loadRentals() {
             try {
                 setLoading(true);
                 setError("");
 
-                const data = await getRentals();
+                const data = await getRentals(filters);
 
-                setRentals(data);
+                if (active) {
+                    setRentals(data.items);
+                    setTotal(data.total);
+                }
             } catch (err) {
                 console.error(err);
 
-                setError(
-                    "Не удалось загрузить помещения. Проверьте подключение к серверу."
-                );
+                if (active) {
+                    if (axios.isAxiosError(err)) {
+                        const detail = err.response?.data?.detail;
+
+                        setError(
+                            typeof detail === "string"
+                                ? detail
+                                : "Не удалось загрузить помещения. Проверьте сервер"
+                        );
+                    } else {
+                        setError("Произошла непредвиденная ошибка")
+                    }
+                }
             } finally {
-                setLoading(false);
+                if (active) {
+                    setLoading(false);
+                }
             }
         }
 
         loadRentals();
-    }, []);
 
-    const categories = useMemo(() => {
-        const map = new Map<number, Category>();
+        return () => {
+            active = false;
+        };
+    }, [filters]);
 
-        rentals.forEach((rental) => {
-            if (rental.category) {
-                map.set(
-                    rental.category.category_id,
-                    rental.category
-                );
-            }
+
+    const updateFilters = (
+        values: Partial<RentalFilters>
+    ) => {
+        setFilters((previous) => ({
+            ...previous,
+            ...values,
+            skip: 0,
+        }));
+    };
+
+    const handleSearch = (values: RentalFilters) => {
+        setFilters((previous) => ({
+            ...previous,
+            ...values,
+            skip: 0,
+        }));
+    };
+
+    const handleCategorySelect = (
+        value: number | "all"
+    ) => {
+        setCategoryId(value);
+
+        updateFilters({
+            category_id:
+                value === "all" ? undefined : value,
         });
+    };
 
-        return Array.from(map.values());
-    }, [rentals]);
+    const handlePriceFilter = () => {
+        setPriceError("");
 
-    const filteredRentals = useMemo(() => {
-        const query = searchQuery.trim().toLowerCase();
+        const min = minPriceInput.trim() === ""
+            ? undefined
+            : Number(minPriceInput);
 
-        const result = rentals.filter((rental) => {
-            const matchesCategory =
-                selectedCategory === "all" ||
-                rental.category_id === selectedCategory;
+        const max = maxPriceInput.trim() === ""
+            ? undefined
+            : Number(maxPriceInput);
 
-            const matchesTime =
-                selectedTime === "ALL" ||
-                rental.time_measurement === selectedTime;
-
-            const searchableText = [
-                rental.title,
-                rental.address,
-                rental.desc ?? "",
-            ]
-                .join(" ")
-                .toLowerCase();
-
-            const matchesSearch =
-                !query || searchableText.includes(query);
-
-            return (
-                matchesCategory &&
-                matchesTime &&
-                matchesSearch
-            );
-        });
-
-        if (sort === "price-asc") {
-            result.sort(
-                (a, b) => Number(a.price) - Number(b.price)
-            );
-        } else if (sort === "price-desc") {
-            result.sort(
-                (a, b) => Number(b.price) - Number(a.price)
-            );
-        } else {
-            result.sort(
-                (a, b) =>
-                    Number(b.avg_rating ?? 0) - 
-                    Number(a.avg_rating ?? 0)
-            );
+        if (
+            (min !== undefined && (!Number.isFinite(min) || min < 0)) ||
+            (max !== undefined && (!Number.isFinite(max) || max < 0))
+        ) {
+            setPriceError("Укажите корректную цену");
+            return;
         }
 
-        return result;
-    }, [
-        rentals,
-        searchQuery,
-        selectedCategory,
-        selectedTime,
-        sort,
-    ]);
+        if (
+            min !== undefined &&
+            max !== undefined &&
+            min > max
+        ) {
+            setPriceError(
+                "Минимальная цена больше максимальной"
+            );
+            return;
+        }
+
+        updateFilters({
+            min_price: min,
+            max_price: max,
+        });
+    };
+
+    const resetFilters = () => {
+        setCategoryId("all");
+
+        setMinPriceInput("");
+        setMaxPriceInput("");
+
+        setPriceError("");
+
+        setHeroKey((previous) => previous + 1);
+
+        setFilters({
+            sort_by: "newest",
+            skip: 0,
+            take: PAGE_SIZE,
+        });
+    };
+
+    const goToPage = (page: number) => {
+        if (page < 1 || page > totalPages) {
+            return;
+        }
+
+        setFilters((previous) => ({
+            ...previous,
+            skip: (page - 1) * PAGE_SIZE,
+        }));
+
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth",
+        });
+    };
 
     return (
         <main>
-            <Hero onSearch={setSearchQuery} />
+           <Hero 
+                key={heroKey}
+                onSearch={handleSearch}
+            />
 
-            <section className="container catalog">
-                <CategoryFilter
-                    categories={categories}
-                    selectedCategory={selectedCategory}
-                    onSelect={setSelectedCategory}
-                />
+           <section className="container catalog">
+            <CategoryFilter
+                categories={categories}
+                selectedCategory={categoryId}
+                onSelect={handleCategorySelect}
+            />
 
-                <div className="catalog__heading">
-                    <div>
-                        <h2>Места для ваших идей</h2>
-
-                        <p className="catalog__subtitle">
-                            Москва · {filteredRentals.length} помещений
-                        </p>
-                    </div>
-
-                    <div className="catalog__controls">
-                        <select
-                            value={selectedTime}
-                            onChange={(e) =>
-                                setSelectedTime(
-                                    e.target.value as TimeMeasurement | "ALL"
-                                )
-                            }
-                        >
-                            <option value="ALL">Все единицы времени</option>
-                            <option value="HOUR">За час</option>
-                            <option value="DAY">За день</option>
-                            <option value="MONTH">За месяц</option>
-                        </select>
-
-                        <select
-                            value={sort}
-                            onChange={(e) => setSort(e.target.value)}
-                        >
-                            <option value="popular">По популярности</option>
-                            <option value="price-asc">Сначала дешевле</option>
-                            <option value="price-desc">Сначала дороже</option>
-                        </select>
-                    </div>
-                </div>
-
-                {loading && (
-                    <p className="catalog__message">
-                        Загрузка помещений...
-                    </p>
-                )}
-
-                {error && (
-                    <p className="catalog__error">
-                        {error}
-                    </p>
-                )}
-
-                {!loading && !error && (
-                    <>
-                        {filteredRentals.length > 0 ? (
-                            <div className="rentals-grid">
-                                {filteredRentals.map((rental) => (
-                                    <RentalCard
-                                        key={rental.rental_id}
-                                        rental={rental}
-                                        onClick={() =>
-                                            navigate(`/rentals/${rental.rental_id}`)
-                                        }
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="catalog__empty">
-                                <h3>Помещения не найдены</h3>
-                                <p>
-                                    Попробуйте изменит поисковый запрос
-                                    или выбрать другую категорию
-                                </p>
-                            </div>
-                        )}
-                    </>
-                )}
-            </section>
-            <section className="container help-banner">
+            <div className="catalog__heading">
                 <div>
-                    <h3>Не знаете, какое мето стоит выбрать?</h3>
-                    <p>
-                        Расскажите нам о планах - поможем найти
-                        подходящее пространство
+                    <h2>Места для ваших идей</h2>
+
+                    <p className="catalog__subtitle">
+                        Найдено помещений: {total}
                     </p>
                 </div>
+
+                <div className="catalog__controls">
+                    <select
+                        value={filters.sort_by ?? "newest"}
+                        onChange={(e) =>
+                            updateFilters({
+                                sort_by: e.target.value as
+                                    "newest" |
+                                    "price_asc" |
+                                    "price_desc",
+                            })
+                        }
+                    >
+                        <option value="newest">
+                            Сначала новые
+                        </option>
+                        <option value="price_asc">
+                            Сначала дешевле
+                        </option>
+                        <option value="price_desc">
+                            Сначала дороже
+                        </option>
+                    </select>
+                </div>
+            </div>
+            <div className="price-filter">
+                <strong>Цена за единицу аренды</strong>
+                <input
+                    type="number"
+                    min="0"
+                    placeholder="От, ₽"
+                    value={minPriceInput}
+                    onChange={(e) =>
+                        setMinPriceInput(e.target.value)
+                    }
+                />
+                <input
+                    type="number"
+                    min="0"
+                    placeholder="До, ₽"
+                    value={maxPriceInput}
+                    onChange={(e) =>
+                        setMaxPriceInput(e.target.value)
+                    }
+                />
                 <button
+                    type="button"
                     className="button button--primary"
-                    onClick={() => navigate("/login")}
+                    onClick={handlePriceFilter}
                 >
-                    Помогите с выбором
+                    Применить
                 </button>
-            </section>
+                <button
+                    type="button"
+                    className="button button--filter-reset"
+                    onClick={resetFilters}
+                >
+                    Сбросить фильтры
+                </button>
+            </div>
+            {priceError && (
+                <p className="catalog__error">
+                    {priceError}
+                </p>
+            )}
+            {loading && (
+                <p className="catalog__message">
+                    Загрузка помещений...
+                </p>
+            )}
+            {error && (
+                <p className="catalog__error">
+                    {error}
+                </p>
+            )}
+            {!loading && !error && (
+                <>
+                    {rentals.length > 0 ? (
+                        <div className="rentals-grid">
+                            {rentals.map((rental) => (
+                                <RentalCard
+                                    key={rental.rental_id}
+                                    rental={rental}
+                                    onClick={() =>
+                                        navigate(
+                                            `/rentals/${rental.rental_id}`
+                                        )
+                                    }
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="catalog__empty">
+                            <h3>Помещения не найдены</h3>
+
+                            <p>
+                                Измените параметры поиска
+                                или сбросьте фильтры
+                            </p>
+                            <button
+                                type="button"
+                                className="button button--primary"
+                                onClick={resetFilters}
+                            >
+                                Сбросить фильтры
+                            </button>
+                        </div>
+                    )}
+
+                    {totalPages > 1 && (
+                        <div className="pagination">
+                            <button
+                                type="button"
+                                disabled={currentPage === 1}
+                                onClick={() =>
+                                    goToPage(currentPage - 1)
+                                }
+                            >
+                                Назад
+                            </button>
+                            <span>
+                                Страница {currentPage} из {totalPages}
+                            </span>
+
+                            <button
+                                type="button"
+                                disabled={
+                                    currentPage === totalPages
+                                }
+                                onClick={() =>
+                                    goToPage(currentPage + 1)
+                                }
+                            >
+                                Далее
+                            </button>
+                        </div>
+                    )}
+                </>
+            )}
+           </section>
+           <section className="container help-banner">
+            <div>
+                <h3>Не знаете, какое место выбрать?</h3>
+                <p>
+                    Расскажите нам о планах - мы поможем
+                    найти подходящее пространство
+                </p>
+            </div>
+            <button
+                type="button"
+                className="button button--primary"
+                onClick={() => navigate("/login")}
+            >
+                Помогите с выбором
+            </button>
+           </section>
         </main>
     );
 }

@@ -2,9 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from app.database import db
 from app.dependencies import get_current_user, require_lesser
-from app.schemas.user import UserPublic, UserUpdate, BlackListCreate, BlackListItem
+from app.schemas.user import (
+    UserPublic,
+    UserUpdate,
+    BlackListCreate,
+    BlackListItem
+)
 from app.schemas.common import MessageResponse
 from prisma.models import User
+from prisma.enums import Role
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
@@ -78,18 +84,59 @@ async def get_my_blacklist(user: User = Depends(require_lesser)):
     return result
 
 
-@router.post("/me/blacklist", response_model=BlackListItem, status_code=201)
-async def add_to_blacklist(body: BlackListCreate, user: User = Depends(require_lesser)):
+@router.post(
+    "/me/blacklist",
+    response_model=BlackListItem,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_to_blacklist(
+    body: BlackListCreate,
+    user: User = Depends(require_lesser)
+):
     if body.renter_id == user.user_id:
-        raise HTTPException(status_code=400, detail="Нельзя добавить себя в ЧС")
-    renter = await db.user.find_unique(where={"user_id": body.renter_id})
-    if not renter:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-    existing = await db.blacklist.find_first(
-        where={"lesser_id": user.user_id, "renter_id": body.renter_id, "is_closed": False}
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нельзя добавить себя в черный список",
+        )
+
+    renter = await db.user.find_unique(
+        where={
+            "user_id": body.renter_id
+        }
     )
+
+    if not renter:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пользователь не найден",
+        )
+
+    existing = await db.blacklist.find_first(
+        where={
+            "lesser_id": user.user_id,
+            "renter_id": body.renter_id,
+            "is_closed": False,
+        }
+    )
+
     if existing:
-        raise HTTPException(status_code=400, detail="Уже в чёрном списке")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Пользователь уже находится в черном списке",
+        )
+
+    if body.fine_id is not None:
+        fine = await db.fine.find_unique(
+            where={
+                "fine_id": body.fine_id
+            }
+        )
+
+        if not fine:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Штраф не найден"
+            )
 
     item = await db.blacklist.create(
         data={
@@ -99,8 +146,7 @@ async def add_to_blacklist(body: BlackListCreate, user: User = Depends(require_l
         },
         include={"renter": True},
     )
-    # Помечаем арендатора
-    await db.user.update(where={"user_id": body.renter_id}, data={"is_blacklisted": True})
+
     return BlackListItem.model_validate(item)
 
 

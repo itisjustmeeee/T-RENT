@@ -45,3 +45,10 @@ export interface Rental {
     avg_rating?: number | null;
     reviews_count?: number;
 }
+
+export interface RentalListResponse {
+    items: Rental[];
+    total: number;
+    skip: number;
+    take: number;
+}
