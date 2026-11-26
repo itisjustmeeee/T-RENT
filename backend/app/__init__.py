@@ -1,1 +1,1 @@
-# T-RENT Backend
+# T-RENT Backend v1.2
