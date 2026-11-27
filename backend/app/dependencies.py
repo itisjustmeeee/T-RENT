@@ -8,6 +8,14 @@ from prisma.models import User
 security = HTTPBearer(auto_error=False)
 
 
+def _role_str(user: User) -> str:
+    """Нормализуем роль к строке (Prisma enum / str)."""
+    role = getattr(user, "role", None)
+    if role is None:
+        return ""
+    return str(role.value) if hasattr(role, "value") else str(role)
+
+
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> User:
@@ -48,12 +56,18 @@ async def get_current_user_optional(
 
 
 async def require_lesser(user: User = Depends(get_current_user)) -> User:
-    if user.role != "LESSER":
-        raise HTTPException(status_code=403, detail="Доступно только арендодателям")
+    if _role_str(user) != "LESSER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступно только арендодателям",
+        )
     return user
 
 
 async def require_renter(user: User = Depends(get_current_user)) -> User:
-    if user.role != "RENTER":
-        raise HTTPException(status_code=403, detail="Доступно только арендаторам")
+    if _role_str(user) != "RENTER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступно только арендаторам",
+        )
     return user

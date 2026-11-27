@@ -237,39 +237,45 @@ async def get_rental_calendar(
     from_date: Optional[datetime] = None,
     to_date: Optional[datetime] = None,
 ):
+    """Календарь занятых слотов объявления."""
     rental = await db.rental.find_unique(where={"rental_id": rental_id})
     if not rental:
         raise HTTPException(status_code=404, detail="Объявление не найдено")
 
-    where: dict = {
-        "rental_id": rental_id,
-        "status": {"in": ["OPEN", "CONFIRMED"]},
-    }
-    if from_date:
-        where["end_date"] = {"gte": from_date}
-    if to_date:
-        where.setdefault("start_date", {})
-        if isinstance(where.get("start_date"), dict):
-            where["start_date"]["lte"] = to_date
-        else:
-            where["start_date"] = {"lte": to_date}
+    if from_date and to_date and to_date < from_date:
+        raise HTTPException(
+            status_code=400,
+            detail="to_date должна быть не раньше from_date",
+        )
 
+    # Простая фильтрация: все активные брони, затем при необходимости режем по датам в Python
     bookings = await db.booking.find_many(
-        where=where,
+        where={
+            "rental_id": rental_id,
+            "status": {"in": ["OPEN", "CONFIRMED"]},
+        },
         order={"start_date": "asc"},
     )
-    return {
-        "rental_id": rental_id,
-        "availability": rental.availability,
-        "booked_slots": [
+
+    slots = []
+    for b in bookings:
+        if from_date is not None and b.end_date < from_date:
+            continue
+        if to_date is not None and b.start_date > to_date:
+            continue
+        slots.append(
             {
                 "booking_id": b.booking_id,
                 "start_date": b.start_date,
                 "end_date": b.end_date,
-                "status": b.status,
+                "status": str(b.status),
             }
-            for b in bookings
-        ],
+        )
+
+    return {
+        "rental_id": rental_id,
+        "availability": str(rental.availability),
+        "booked_slots": slots,
     }
 
 
