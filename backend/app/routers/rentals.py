@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional, List, Any, cast
 from datetime import datetime, timezone
 from decimal import Decimal
 from app.database import db
 from app.dependencies import (
     get_current_user,
     get_current_user_optional,
-    require_lesser,
+    require_lesser
 )
 from app.schemas.rental import (
     RentalCreate,
@@ -17,12 +16,7 @@ from app.schemas.rental import (
 )
 from app.schemas.common import MessageResponse
 from prisma.models import User
-from prisma.enums import BookingStatus
-from prisma.types import (
-    RentalWhereInput,
-    RentalUpdateInput,
-    BookingWhereInput,
-)
+from typing import Optional, List, Literal
 
 router = APIRouter(tags=["Rentals"])
 
@@ -38,77 +32,23 @@ async def get_rentals(
     category_id: Optional[int] = None,
     owner_id: Optional[int] = None,
     availability: Optional[str] = None,
-    min_price: Optional[float] = Query(None, ge=0),
-    max_price: Optional[float] = Query(None, ge=0),
-    min_area: Optional[float] = Query(None, ge=0),
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    min_area: Optional[float] = None,
+    min_guests: Optional[int] = Query(None, ge=1, le=500),
     search: Optional[str] = None,
+    sort_by: Literal["newest", "price_asc", "price_desc"] = "newest",
     skip: int = Query(0, ge=0),
-    take: int = Query(9, ge=1, le=100),
+    take: int = Query(20, ge=1, le=100),
     user: Optional[User] = Depends(get_current_user_optional),
-    city: Optional[str] = None,
-    min_guests: Optional[int] = Query(None, ge=1),
-    start_at: Optional[datetime] = None,
-    end_at: Optional[datetime] = None,
-    sort_by: str = "newest",
 ):
-    where: dict[str, Any] = {}
-
-    if min_price is not None and max_price is not None:
-        if min_price > max_price:
-            raise HTTPException(
-                status_code=400,
-                detail="Минимальная цена не может быть больше максимальной",
-            )
-
-    if (start_at is None) != (end_at is None):
-        raise HTTPException(
-            status_code=400,
-            detail="Необходимо указать и начало, и окончание аренды",
-        )
-
-    if sort_by not in ("newest", "price_asc", "price_desc"):
-        raise HTTPException(
-            status_code=400,
-            detail="Недопустимый параметр сортировки",
-        )
-
+    where: dict = {}
     if category_id is not None:
         where["category_id"] = category_id
-
     if owner_id is not None:
         where["owner_id"] = owner_id
-
     if availability is not None:
         where["availability"] = availability
-
-    if city and city.strip():
-        where["address"] = {
-            "contains": city.strip(),
-            "mode": "insensitive"
-        }
-
-    if search and search.strip():
-        where["OR"] = [
-            {
-                "title": {
-                    "contains": search.strip(),
-                    "mode": "insensitive",
-                }
-            },
-            {
-                "address": {
-                    "contains": search.strip(),
-                    "mode": "insensitive"
-                }
-            },
-            {
-                "desc": {
-                    "contains": search.strip(),
-                    "mode": "insensitive"
-                }
-            },
-        ]
-
     if min_price is not None or max_price is not None:
         price_filter = {}
         if min_price is not None:
@@ -116,103 +56,43 @@ async def get_rentals(
         if max_price is not None:
             price_filter["lte"] = Decimal(str(max_price))
         where["price"] = price_filter
-
     if min_area is not None:
         where["area"] = {"gte": Decimal(str(min_area))}
-
     if min_guests is not None:
-        where["amount_of_people"] = {
-            "gte": min_guests
-        }
+        where["amount_of_people"] = {"gte": min_guests}
+    if search:
+        where["OR"] = [
+            {"title": {"contains": search, "mode": "insensitive"}},
+            {"address": {"contains": search, "mode": "insensitive"}},
+            {"desc": {"contains": search, "mode": "insensitive"}},
+        ]
 
-    if start_at is not None and end_at is not None:
-        if start_at.tzinfo is None:
-            start_at = start_at.replace(tzinfo=timezone.utc)
+    total = await db.rental.count(where=where)
 
-        if end_at.tzinfo is None:
-            end_at = end_at.replace(tzinfo=timezone.utc)
-
-        start_at = start_at.astimezone(timezone.utc)
-        end_at = end_at.astimezone(timezone.utc)
-
-        if start_at >= end_at:
-            raise HTTPException(
-                status_code=400,
-                detail="Окончание аренды должно быть позже начала",
-            )
-
-        busy_bookings = await db.booking.find_many(
-            where={
-                "OR": [
-                    {
-                        "status": BookingStatus.OPEN
-                    },
-                    {
-                        "status": BookingStatus.CONFIRMED
-                    },
-                ],
-                "start_date": {
-                    "lt": end_at
-                },
-                "end_date": {
-                    "gt": start_at
-                },
-            },
-        )
-
-        busy_rental_ids = list({
-            booking.rental_id
-            for booking in busy_bookings
-        })
-
-        if busy_rental_ids:
-            where["rental_id"] = {
-                "not_in": busy_rental_ids
-            }
-
-    sort_options = {
-        "newest": {
-            "created_at": "desc"
-        },
-        "price_asc": {
-            "price": "asc"
-        },
-        "price_desc": {
-            "price": "desc"
-        },
-    }
-
-    order = sort_options[sort_by]
-
-    total = await db.rental.count(
-        where=cast(RentalWhereInput, where)
-    )
+    sort_order = {
+        "newest": {"created_at": "desc"},
+        "price_asc": {"price": "asc"},
+        "price_desc": {"price": "desc"},
+    }[sort_by]
 
     rentals = await db.rental.find_many(
-        where=cast(RentalWhereInput, where),
+        where=where,
         skip=skip,
         take=take,
         include={
             "owner": True,
             "category": True,
-            "photos": {
-                "order_by": {
-                    "sort_order": "asc"
-                }
-            },
+            "photos": {"order_by": {"sort_order": "asc"}},
         },
-        order=cast(Any, order),
+        order=sort_order,
     )
     # Убираем password_hash
     result = []
-
-    for rental in rentals:
-        data = rental.model_dump()
-
-        if data.get("owner"):
-            data["owner"].pop("password_hash", None)
-
-        result.append(data)
+    for r in rentals:
+        d = r.model_dump()
+        if d.get("owner"):
+            d["owner"].pop("password_hash", None)
+        result.append(d)
 
     return {
         "items": result,
@@ -233,14 +113,7 @@ async def get_rental(
             "owner": True,
             "category": True,
             "photos": {"order_by": {"sort_order": "asc"}},
-            "reviews": {
-                "include": {
-                    "author": True
-                },
-                "order_by": {
-                    "created_at": "desc"
-                }
-            },
+            "reviews": {"include": {"author": True}, "order_by": {"created_at": "desc"}},
         },
     )
     if not rental:
@@ -249,12 +122,7 @@ async def get_rental(
     # Записываем просмотр
     if user:
         existing = await db.viewedrental.find_unique(
-            where={
-                "user_id_rental_id": {
-                    "user_id": user.user_id,
-                    "rental_id": rental_id
-                }
-            }
+            where={"user_id_rental_id": {"user_id": user.user_id, "rental_id": rental_id}}
         )
         if existing:
             await db.viewedrental.update(
@@ -287,14 +155,9 @@ async def get_rental(
 
 
 @router.post("/api/rentals", status_code=201)
-async def create_rental(
-    body: RentalCreate,
-    user: User = Depends(require_lesser)
-):
+async def create_rental(body: RentalCreate, user: User = Depends(require_lesser)):
     if body.category_id:
-        cat = await db.category.find_unique(where={
-            "category_id": body.category_id
-        })
+        cat = await db.category.find_unique(where={"category_id": body.category_id})
         if not cat:
             raise HTTPException(status_code=400, detail="Категория не найдена")
 
@@ -305,12 +168,12 @@ async def create_rental(
             "address": body.address,
             "area": body.area,
             "price": body.price,
-            "time_measurement": cast(Any, body.time_measurement),
+            "time_measurement": body.time_measurement,
             "category_id": body.category_id,
             "desc": body.desc,
             "amount_of_people": body.amount_of_people,
             "photo_url": body.photo_url,
-            "availability": cast(Any, body.availability),
+            "availability": body.availability,
         },
         include={"category": True, "photos": True},
     )
@@ -327,26 +190,19 @@ async def update_rental(
     if not rental:
         raise HTTPException(status_code=404, detail="Объявление не найдено")
     if rental.owner_id != user.user_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Нет прав на редактирование"
-        )
+        raise HTTPException(status_code=403, detail="Нет прав на редактирование")
 
     data = body.model_dump(exclude_unset=True)
     if not data:
         return rental
     if "category_id" in data and data["category_id"]:
-        cat = await db.category.find_unique(where={
-            "category_id": data[
-                "category_id"
-            ]
-        })
+        cat = await db.category.find_unique(where={"category_id": data["category_id"]})
         if not cat:
             raise HTTPException(status_code=400, detail="Категория не найдена")
 
     updated = await db.rental.update(
         where={"rental_id": rental_id},
-        data=cast(RentalUpdateInput, data),
+        data=data,
         include={"category": True, "photos": True},
     )
     return updated
@@ -366,7 +222,7 @@ async def update_rental_status(
 
     updated = await db.rental.update(
         where={"rental_id": rental_id},
-        data={"availability": cast(Any, body.availability)},
+        data={"availability": body.availability},
     )
     return updated
 
@@ -383,14 +239,7 @@ async def delete_rental(rental_id: int, user: User = Depends(require_lesser)):
     active = await db.booking.count(
         where={
             "rental_id": rental_id,
-            "OR": [
-                {
-                    "status": BookingStatus.OPEN
-                },
-                {
-                    "status": BookingStatus.CONFIRMED
-                },
-            ],
+            "status": {"in": ["OPEN", "CONFIRMED"]},
         }
     )
     if active > 0:
@@ -409,39 +258,45 @@ async def get_rental_calendar(
     from_date: Optional[datetime] = None,
     to_date: Optional[datetime] = None,
 ):
+    """Календарь занятых слотов объявления."""
     rental = await db.rental.find_unique(where={"rental_id": rental_id})
     if not rental:
         raise HTTPException(status_code=404, detail="Объявление не найдено")
 
-    where: dict = {
-        "rental_id": rental_id,
-        "status": {"in": ["OPEN", "CONFIRMED"]},
-    }
-    if from_date:
-        where["end_date"] = {"gte": from_date}
-    if to_date:
-        where.setdefault("start_date", {})
-        if isinstance(where.get("start_date"), dict):
-            where["start_date"]["lte"] = to_date
-        else:
-            where["start_date"] = {"lte": to_date}
+    if from_date and to_date and to_date < from_date:
+        raise HTTPException(
+            status_code=400,
+            detail="to_date должна быть не раньше from_date",
+        )
 
+    # Простая фильтрация: все активные брони, затем при необходимости режем по датам в Python
     bookings = await db.booking.find_many(
-        where=cast(BookingWhereInput, where),
+        where={
+            "rental_id": rental_id,
+            "status": {"in": ["OPEN", "CONFIRMED"]},
+        },
         order={"start_date": "asc"},
     )
-    return {
-        "rental_id": rental_id,
-        "availability": rental.availability,
-        "booked_slots": [
+
+    slots = []
+    for b in bookings:
+        if from_date is not None and b.end_date < from_date:
+            continue
+        if to_date is not None and b.start_date > to_date:
+            continue
+        slots.append(
             {
                 "booking_id": b.booking_id,
                 "start_date": b.start_date,
                 "end_date": b.end_date,
-                "status": b.status,
+                "status": str(b.status),
             }
-            for b in bookings
-        ],
+        )
+
+    return {
+        "rental_id": rental_id,
+        "availability": str(rental.availability),
+        "booked_slots": slots,
     }
 
 
@@ -462,7 +317,7 @@ async def create_rental_review(
         where={
             "rental_id": rental_id,
             "booker_id": user.user_id,
-            "status": BookingStatus.CLOSED,
+            "status": "CLOSED",
         }
     )
     if not past:

@@ -8,64 +8,33 @@ interface HeroProps {
 
 function Hero({ onSearch }: HeroProps) {
     const [search, setSearch] = useState("");
-    const [city, setCity] = useState("");
-    const [date, setDate] = useState("");
 
-    const [startTime, setStartTime] = useState("14:00");
-    const [endTime, setEndTime] = useState("18:00");
-
-    const [guests, setGuests] = useState(1);
-
+    const [minGuests, setMinGuests] = useState("");
     const [error, setError] = useState("");
-
-    const today = new Date();
-
-    const minDate = [
-        today.getFullYear(),
-        String(today.getMonth() + 1).padStart(2, "0"),
-        String(today.getDate()).padStart(2, "0"),
-    ].join("-");
 
     const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError("");
 
-        const filters: RentalFilters = {
-            search: search.trim() || undefined,
-            city: city.trim() || undefined,
-            min_guests: guests,
-        };
+        let guests: number | undefined;
 
-        if (date) {
-            if (!startTime || !endTime) {
-                setError("Укажите время начала и окончания");
-                return;
-            }
-
-            const start = new Date(
-                `${date}T${startTime}:00`
-            );
-
-            const end = new Date(
-                `${date}T${endTime}:00`
-            );
+        if (minGuests.trim() !== "") {
+            guests = Number(minGuests);
 
             if (
-                Number.isNaN(start.getTime()) ||
-                Number.isNaN(end.getTime()) ||
-                end <= start
+                !Number.isInteger(guests) ||
+                guests < 1 ||
+                guests > 500
             ) {
-                setError(
-                    "Время окончания должно быть позже начала"
-                );
+                setError("Укажите количество гостей от 1 до 500");
                 return;
             }
-
-            filters.start_at = start.toISOString();
-            filters.end_at = end.toISOString();
         }
 
-        onSearch(filters);
+        onSearch({
+            search: search.trim() || undefined,
+            min_guests: guests,
+        });
     };
 
     return (
@@ -100,6 +69,7 @@ function Hero({ onSearch }: HeroProps) {
                                 setSearch(e.target.value)
                             }
                         />
+
                         <button
                             type="submit"
                             className="button button--primary"
@@ -109,77 +79,26 @@ function Hero({ onSearch }: HeroProps) {
                     </div>
                     <div className="hero__filters">
                         <label className="hero__filter">
-                            <span>Город</span>
-
-                            <input
-                                type="text"
-                                placeholder="Москва, Владимир, ..."
-                                value={city}
-                                onChange={(e) =>
-                                    setCity(e.target.value)
-                                }
-                            />
-                        </label>
-                        <label className="hero__filter">
-                            <span>Дата</span>
-
-                            <input
-                                type="date"
-                                value={date}
-                                min={minDate}
-                                onChange={(e) =>
-                                    setDate(e.target.value)
-                                }
-                            />
-                        </label>
-                        <div className="hero__filter hero__time">
-                            <span>Время</span>
-
-                            <div className="hero__time-inputs">
-
-                                <input
-                                    type="time"
-                                    value={startTime}
-                                    onChange={(e) =>
-                                        setStartTime(e.target.value)
-                                    }
-                                    aria-label="Начало аренды"
-                                />
-
-                                <span>—</span>
-
-                                <input
-                                    type="time"
-                                    value={endTime}
-                                    onChange={(e) =>
-                                        setEndTime(e.target.value)
-                                    }
-                                    aria-label="Окончание аренды"
-                                />
-                            </div>
-                        </div>
-                        <label className="hero__filter">
-                            <span>Гости</span>
+                            <span>Количество гостей</span>
 
                             <input
                                 type="number"
                                 min="1"
-                                max="1000"
-                                value={guests}
-                                onChange={(e) =>
-                                    setGuests(
-                                        Math.max(1, Number(e.target.value))
-                                    )
-                                }
+                                max="500"
+                                placeholder="Например, 5"
+                                value={minGuests}
+                                onChange={(e) => setMinGuests(e.target.value)}
                             />
                         </label>
                     </div>
+
                     {error && (
                         <p className="hero__error">
                             {error}
                         </p>
                     )}
                 </form>
+
                 <p className="hero__hint">
                     Без звонков и долгих согласований.
                     Выберите место в удобное время.

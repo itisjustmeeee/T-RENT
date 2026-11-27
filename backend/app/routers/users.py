@@ -1,16 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List
+from typing import List, Optional
 from app.database import db
-from app.dependencies import get_current_user, require_lesser
-from app.schemas.user import (
-    UserPublic,
-    UserUpdate,
-    BlackListCreate,
-    BlackListItem
-)
+from app.dependencies import get_current_user, require_lesser, _role_str
+from app.schemas.user import UserPublic, UserUpdate, BlackListCreate, BlackListItem
 from app.schemas.common import MessageResponse
 from prisma.models import User
-from prisma.enums import Role
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
@@ -18,57 +12,35 @@ router = APIRouter(prefix="/api/users", tags=["Users"])
 def _safe_user(user) -> dict:
     data = user.model_dump() if hasattr(user, "model_dump") else dict(user)
     data.pop("password_hash", None)
+    if "role" in data and data["role"] is not None:
+        data["role"] = str(data["role"].value) if hasattr(data["role"], "value") else str(data["role"])
     return data
 
 
 @router.get("/me", response_model=UserPublic)
 async def get_me(user: User = Depends(get_current_user)):
-    return UserPublic.model_validate(user)
+    return UserPublic.model_validate(_safe_user(user))
 
 
 @router.patch("/me", response_model=UserPublic)
 async def update_me(body: UserUpdate, user: User = Depends(get_current_user)):
     data = body.model_dump(exclude_unset=True)
     if not data:
-        return UserPublic.model_validate(user)
+        return UserPublic.model_validate(_safe_user(user))
     updated = await db.user.update(where={"user_id": user.user_id}, data=data)
-    return UserPublic.model_validate(updated)
+    return UserPublic.model_validate(_safe_user(updated))
 
 
 @router.delete("/me", response_model=MessageResponse)
 async def delete_me(user: User = Depends(get_current_user)):
-    # Мягкое удаление через is_blocked или hard delete
     await db.refreshtoken.delete_many(where={"user_id": user.user_id})
     await db.user.delete(where={"user_id": user.user_id})
     return MessageResponse(message="Аккаунт удалён")
 
 
-@router.get("/{user_id}")
-async def get_user_public(user_id: int):
-    user = await db.user.find_unique(
-        where={"user_id": user_id},
-        include={"rentals": True},
-    )
-    if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-    data = _safe_user(user)
-    # Добавляем публичные объявления
-    data["rentals"] = [
-        {
-            "rental_id": r.rental_id,
-            "title": r.title,
-            "price": str(r.price),
-            "availability": r.availability,
-            "photo_url": r.photo_url,
-        }
-        for r in (user.rentals or [])
-    ]
-    return data
+# ---------- Blacklist (ЧС) — до /{user_id}, чтобы пути /me/* не пересекались ----------
 
-
-# ---------- Blacklist (ЧС) ----------
-
-@router.get("/me/blacklist", response_model=List[BlackListItem])
+@router.get("/me/blacklist")
 async def get_my_blacklist(user: User = Depends(require_lesser)):
     items = await db.blacklist.find_many(
         where={"lesser_id": user.user_id, "is_closed": False},
@@ -77,77 +49,65 @@ async def get_my_blacklist(user: User = Depends(require_lesser)):
     )
     result = []
     for item in items:
-        d = BlackListItem.model_validate(item)
-        if item.renter:
-            d.renter = UserPublic.model_validate(item.renter)
+        d = {
+            "black_list_id": item.black_list_id,
+            "lesser_id": item.lesser_id,
+            "renter_id": item.renter_id,
+            "is_closed": item.is_closed,
+            "created_at": item.created_at,
+            "fine_id": item.fine_id,
+            "renter": _safe_user(item.renter) if item.renter else None,
+        }
         result.append(d)
     return result
 
 
-@router.post(
-    "/me/blacklist",
-    response_model=BlackListItem,
-    status_code=status.HTTP_201_CREATED,
-)
-async def add_to_blacklist(
-    body: BlackListCreate,
-    user: User = Depends(require_lesser)
-):
+@router.post("/me/blacklist", status_code=201)
+async def add_to_blacklist(body: BlackListCreate, user: User = Depends(require_lesser)):
     if body.renter_id == user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Нельзя добавить себя в черный список",
-        )
+        raise HTTPException(status_code=400, detail="Нельзя добавить себя в ЧС")
 
-    renter = await db.user.find_unique(
-        where={
-            "user_id": body.renter_id
-        }
-    )
-
+    renter = await db.user.find_unique(where={"user_id": body.renter_id})
     if not renter:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Пользователь не найден",
-        )
-
-    existing = await db.blacklist.find_first(
-        where={
-            "lesser_id": user.user_id,
-            "renter_id": body.renter_id,
-            "is_closed": False,
-        }
-    )
-
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Пользователь уже находится в черном списке",
-        )
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
 
     if body.fine_id is not None:
-        fine = await db.fine.find_unique(
-            where={
-                "fine_id": body.fine_id
-            }
+        fine = await db.fine.find_unique(where={"fine_id": body.fine_id})
+        if not fine:
+            raise HTTPException(status_code=400, detail="Штраф с таким fine_id не найден")
+
+    existing = await db.blacklist.find_first(
+        where={"lesser_id": user.user_id, "renter_id": body.renter_id, "is_closed": False}
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Уже в чёрном списке")
+
+    try:
+        item = await db.blacklist.create(
+            data={
+                "lesser_id": user.user_id,
+                "renter_id": body.renter_id,
+                "fine_id": body.fine_id,
+            },
+            include={"renter": True},
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Не удалось добавить в ЧС: {str(e)[:200]}",
         )
 
-        if not fine:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Штраф не найден"
-            )
+    await db.user.update(where={"user_id": body.renter_id}, data={"is_blacklisted": True})
 
-    item = await db.blacklist.create(
-        data={
-            "lesser_id": user.user_id,
-            "renter_id": body.renter_id,
-            "fine_id": body.fine_id,
-        },
-        include={"renter": True},
-    )
-
-    return BlackListItem.model_validate(item)
+    return {
+        "black_list_id": item.black_list_id,
+        "lesser_id": item.lesser_id,
+        "renter_id": item.renter_id,
+        "is_closed": item.is_closed,
+        "created_at": item.created_at,
+        "fine_id": item.fine_id,
+        "renter": _safe_user(item.renter) if item.renter else None,
+    }
 
 
 @router.delete("/me/blacklist/{renter_id}", response_model=MessageResponse)
@@ -157,8 +117,10 @@ async def remove_from_blacklist(renter_id: int, user: User = Depends(require_les
     )
     if not item:
         raise HTTPException(status_code=404, detail="Запись не найдена")
-    await db.blacklist.update(where={"black_list_id": item.black_list_id}, data={"is_closed": True})
-    # Если больше нет активных ЧС — снимаем флаг
+    await db.blacklist.update(
+        where={"black_list_id": item.black_list_id},
+        data={"is_closed": True},
+    )
     remaining = await db.blacklist.count(
         where={"renter_id": renter_id, "is_closed": False}
     )
@@ -179,8 +141,7 @@ async def get_my_rentals(user: User = Depends(require_lesser)):
 
 @router.get("/me/bookings")
 async def get_my_bookings(user: User = Depends(get_current_user)):
-    # Для арендатора — его брони, для арендодателя — брони на его объекты
-    if user.role == "RENTER":
+    if _role_str(user) == "RENTER":
         bookings = await db.booking.find_many(
             where={"booker_id": user.user_id},
             include={"rental": True, "owner": True},
@@ -204,3 +165,25 @@ async def get_viewed(user: User = Depends(get_current_user)):
         take=50,
     )
     return [i.rental for i in items if i.rental]
+
+
+@router.get("/{user_id}")
+async def get_user_public(user_id: int):
+    user = await db.user.find_unique(
+        where={"user_id": user_id},
+        include={"rentals": True},
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    data = _safe_user(user)
+    data["rentals"] = [
+        {
+            "rental_id": r.rental_id,
+            "title": r.title,
+            "price": str(r.price),
+            "availability": str(r.availability),
+            "photo_url": r.photo_url,
+        }
+        for r in (user.rentals or [])
+    ]
+    return data

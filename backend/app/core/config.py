@@ -3,7 +3,7 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql://trent:trent_password@localhost:5432/t_rent"
+    DATABASE_URL: str = "postgresql://trent:trent_password@localhost:55432/t_rent"
     APP_NAME: str = "T-RENT API"
     APP_VERSION: str = "1.2.0"
     SECRET_KEY: str = "change-me-to-a-long-random-secret-key-in-production-at-least-32-chars"

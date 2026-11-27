@@ -107,7 +107,7 @@ model Rental {
 
   // Relations
   owner     User             @relation("OwnerRentals", fields: [owner_id], references: [user_id])
-  category  Category?        @relation(fields: [category_id], references: [category_id])
+  category  Category?        @relation(fields: [category_id], references: [category_id], onDelete: Restrict)
   bookings  Booking[]
   reviews   ReviewOfRental[]
   favorites Favorite[]

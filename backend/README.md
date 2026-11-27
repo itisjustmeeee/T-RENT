@@ -10,6 +10,20 @@
 - bcrypt для паролей
 - Docker Compose для БД
 
+## Исправления по баг-репортам (v1.2.1)
+
+| № | Баг | Исправление |
+|---|-----|-------------|
+| 1 | Удаление категории обнуляло `rentals.category_id` | FK `onDelete: Restrict` |
+| 2 | `prisma db push` — Can't reach localhost:5432 | Порт хоста **55432** (docker + `.env`) |
+| 3 | 500 при создании объявления арендатором | Стабильный `403` через `require_lesser` |
+| 4 | Ошибка календаря `/rentals/{id}/calendar` | Переписан запрос слотов |
+| 5 | 500 при добавлении в ЧС | Валидация + безопасный ответ без падения |
+| 6 | Нет проверки URL фото | Валидация `http(s)://` и `/uploads/...` |
+| 7 | Нет проверки id в порядке фото | Проверка принадлежности объявлению |
+
+После обновления схемы: `prisma db push` (если БД уже была — Restrict применится к новым удалениям).
+
 ## Что реализовано в 1.2
 
 ### Авторизация и аккаунт
@@ -83,7 +97,7 @@
 docker compose up -d
 ```
 
-PostgreSQL будет на `localhost:5432`  
+PostgreSQL будет на `localhost:55432`  
 Логин: `trent` / Пароль: `trent_password` / БД: `t_rent`
 
 ### 2. Окружение и зависимости
@@ -105,7 +119,7 @@ pip install bcrypt==4.0.1
 Проверь в `.env`:
 ```env
 APP_VERSION=1.2.0
-DATABASE_URL=postgresql://trent:trent_password@localhost:5432/t_rent
+DATABASE_URL=postgresql://trent:trent_password@localhost:55432/t_rent
 SECRET_KEY=change-me-to-a-long-random-secret-key-in-production-at-least-32-chars
 ```
 
