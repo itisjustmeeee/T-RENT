@@ -153,7 +153,19 @@ async def get_my_bookings(user: User = Depends(get_current_user)):
             include={"rental": True, "booker": True},
             order={"created_at": "desc"},
         )
-    return bookings
+
+    result = []
+
+    for booking in bookings:
+        data = booking.model_dump()
+
+        for key in ("owner", "booker"):
+            if data.get(key):
+                data[key].pop("password_hash", None)
+
+        result.append(data)
+
+    return result
 
 
 @router.get("/me/viewed")

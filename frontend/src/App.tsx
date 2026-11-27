@@ -11,6 +11,9 @@ import { Navigate } from "react-router-dom";
 import ProfilePage from "./pages/ProfilePage";
 import { useAuth } from "./context/AuthContext";
 
+import BookingPage from "./pages/BookingPage";
+import MyBookingPage from "./pages/MyBookingPage";
+
 function App() {
   const { isAuthenticated } = useAuth();
 
@@ -37,6 +40,16 @@ function App() {
               ? <ProfilePage />
               : <Navigate to="/login" replace/>
           }
+        />
+
+        <Route
+          path="/rentals/:rentalId/booking"
+          element={<BookingPage />}
+        />
+
+        <Route
+          path="/bookings"
+          element={<MyBookingPage />}
         />
 
         <Route path="*" element={<Navigate to="/" replace />}/>

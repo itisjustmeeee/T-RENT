@@ -51,9 +51,14 @@ function Header() {
                         </NavLink>
                     )}
 
-                    <span className="nav-link nav-link--disabled">
-                        Бронирования
-                    </span>
+                    <NavLink 
+                        to="/bookings"
+                        className={({ isActive }) =>
+                            isActive ? "nav-link active" : "nav-link"
+                        }
+                    >
+                        Мои бронирования
+                    </NavLink>
 
                     <span className="nav-link nav-link--disabled">
                         Избранное
