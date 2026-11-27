@@ -24,6 +24,7 @@ interface AuthContextType {
     login: (data: LoginRequest) => Promise<void>;
     register: (data: RegisterRequest) => Promise<void>;
     logout: () => Promise<void>;
+    updateUser: (user: AuthUser) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -67,6 +68,11 @@ export function AuthProvider({
         saveSession(response);
     }
 
+    function updateUser(updatedUser: AuthUser) {
+        localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+        setUser(updatedUser);
+    }
+
     async function logout() {
         const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 
@@ -93,6 +99,7 @@ export function AuthProvider({
                 login,
                 register,
                 logout,
+                updateUser,
             }}
         >
             {children}

@@ -51,14 +51,16 @@ function Header() {
                         </NavLink>
                     )}
 
-                    <NavLink 
-                        to="/bookings"
-                        className={({ isActive }) =>
-                            isActive ? "nav-link active" : "nav-link"
-                        }
-                    >
-                        Мои бронирования
-                    </NavLink>
+                    {isAuthenticated && (
+                        <NavLink
+                            to="/bookings"
+                            className={({ isActive }) =>
+                                isActive ? "nav-link active" : "nav-link"
+                            }
+                        >
+                            Мои бронирования
+                        </NavLink>
+                    )}
 
                     <span className="nav-link nav-link--disabled">
                         Избранное
@@ -71,7 +73,9 @@ function Header() {
                 {isAuthenticated ? (
                     <div className="header__account">
                         <span className="header__user-name">
-                            {user?.name}
+                            {user
+                                ? [user.name, user.surname].filter(Boolean).join(" ")
+                                : ""}
                         </span>
 
                         <button

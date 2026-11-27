@@ -1570,3 +1570,374 @@ button {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
+.home-hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 25px;
+    justify-content: center;
+}
+
+.home-categories {
+    padding-top: 55px;
+    padding-bottom: 35px;
+}
+
+.home-categories__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.home-category {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+
+    min-height: 170px;
+    padding: 22px;
+
+    border: none;
+    border-radius: var(--radius);
+
+    color: #171717;
+    text-align: left;
+
+    transition: 0.2s;
+}
+
+.home-category:hover {
+    transform: translateY(-4px);
+}
+
+.home-category span {
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.home-category strong {
+    font-size: 22px;
+}
+
+.home-category small {
+    font-size: 12px;
+    color: #555;
+}
+
+.home-category--0 {
+    background: var(--color-green);
+}
+
+.home-category--1 {
+    background: var(--color-cyan);
+}
+
+.home-category--2 {
+    background: #72d5f5;
+}
+
+.home-rentals {
+    padding-top: 30px;
+    padding-bottom: 55px;
+}
+
+.home-benefits {
+    padding-top: 45px;
+    padding-bottom: 55px;
+}
+
+.home-benefits__heading {
+    margin-bottom: 25px;
+}
+
+.home-benefits__heading h2 {
+    margin-bottom: 8px;
+    font-size: 25px;
+    color: #171717;
+}
+
+.home-benefits__heading p {
+    color: var(--color-text-muted);
+    font-size: 13px;
+}
+
+.home-benefits__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.home-benefit {
+    padding: 24px;
+
+    background: #fff;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.home-benefit > span {
+    display: inline-flex;
+    margin-bottom: 20px;
+
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+.home-benefit h3 {
+    margin: 0 0 10px;
+    font-size: 17px;
+    color: #171717;
+}
+
+.home-benefit p {
+    margin: 0;
+    color: #666;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.profile-page {
+    min-height: 550px;
+    padding-top: 45px;
+    padding-bottom: 65px;
+}
+
+.profile-page__heading {
+    margin-bottom: 28px;
+}
+
+.profile-page__heading h1 {
+    margin: 10px 0;
+    font-size: 32px;
+    color: #171717;
+}
+
+.profile-card {
+    width: 100%;
+    max-width: 850px;
+    margin: 0 auto;
+    padding: 36px;
+
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+
+    background: #fff;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
+}
+
+.profile-title {
+    margin: 0;
+    font-size: 26px;
+    color: #171717;
+}
+
+.profile-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    width: 76px;
+    height: 76px;
+
+    background: linear-gradient(135deg, #ffb84d, #fb931c);
+    border: 3px solid #fff;
+    border-radius: 50%;
+
+    color: #fff;
+    font-size: 32px;
+    font-weight: 800;
+    text-transform: uppercase;
+
+    box-shadow:
+        0 0 0 2px rgba(251, 147, 28, 0.35),
+        0 5px 14px rgba(0, 0, 0, 0.12);
+}
+
+.profile-role {
+    align-self: flex-start;
+    margin: 0;
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+.profile-info {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 4px;
+}
+
+.profile-info-row {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    align-items: center;
+    gap: 20px;
+
+    padding: 18px 20px;
+
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+}
+
+.profile-info-row span {
+    color: var(--color-text-muted);
+    font-size: 13px;
+}
+
+.profile-info-row strong {
+    color: #171717;
+    font-size: 14px;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.profile-form {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    width: 100%;
+    margin-top: 8px;
+}
+
+.profile-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    color: #444;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.profile-form input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 48px;
+    padding: 12px 15px;
+
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+    background: #fff;
+
+    font: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.profile-form input:focus {
+    border-color: var(--color-primary);
+}
+
+.profile-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+
+    margin-top: 8px;
+    padding-top: 24px;
+
+    border-top: 1px solid var(--color-border);
+}
+
+.profile-button {
+    min-height: 46px;
+    padding: 12px 22px;
+
+    border: none;
+    border-radius: 9px;
+
+    background: var(--color-primary);
+    color: #fff;
+
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.profile-button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.profile-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.profile-button--secondary {
+    background: #eee;
+    color: #333;
+}
+
+.profile-button--danger {
+    background: #d94848;
+}
+
+.profile-error {
+    padding: 13px 16px;
+    margin: 0;
+
+    background: #fff0f0;
+    border-radius: 8px;
+
+    color: #d94848;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+@media (max-width: 700px) {
+    .profile-page {
+        padding-top: 30px;
+        padding-bottom: 40px;
+    }
+
+    .profile-card {
+        padding: 24px;
+        gap: 17px;
+    }
+
+    .profile-info-row {
+        grid-template-columns: 110px minmax(0, 1fr);
+        gap: 12px;
+        padding: 15px;
+    }
+}
+
+@media (max-width: 500px) {
+    .profile-card {
+        padding: 20px;
+    }
+
+    .profile-title {
+        font-size: 22px;
+    }
+
+    .profile-info-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .profile-info-row strong {
+        text-align: left;
+    }
+
+    .profile-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .profile-button {
+        width: 100%;
+    }
+}

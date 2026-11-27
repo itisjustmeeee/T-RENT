@@ -429,12 +429,17 @@ function CatalogPage() {
                     </p>
                 </div>
 
-                <button
+               <button
                     type="button"
                     className="button button--primary"
-                    onClick={() => navigate("/login")}
+                    onClick={() =>
+                        window.scrollTo({
+                            top: 0,
+                            behavior: "smooth",
+                        })
+                    }
                 >
-                    Помогите с выбором
+                    Перейти к поиску
                 </button>
             </section>
         </main>

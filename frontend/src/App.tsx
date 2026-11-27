@@ -49,7 +49,11 @@ function App() {
 
         <Route
           path="/bookings"
-          element={<MyBookingPage />}
+          element={
+            isAuthenticated
+              ? <MyBookingPage />
+              : <Navigate to="/login" replace/>
+            }
         />
 
         <Route path="*" element={<Navigate to="/" replace />}/>
