@@ -27,6 +27,7 @@ export interface BookingRental {
     price: number | string;
     time_measurement: "HOUR" | "DAY" | "MONTH";
     photo_url?: string | null;
+    amount_of_people: number;
 }
 
 export interface Booking {

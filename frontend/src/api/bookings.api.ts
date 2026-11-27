@@ -6,6 +6,13 @@ import type {
     BookingStatus,
 } from "../types/booking.types";
 
+export interface BookingUpdate {
+    start_date?: string;
+    end_date?: string;
+    guests_count?: number;
+    comment?: string;
+}
+
 export async function createBooking(
     data: BookingCreate
 ): Promise<Booking> {
@@ -42,6 +49,18 @@ export async function updateBookingStatus(
     const response = await api.patch<Booking>(
         `/bookings/${bookingId}/status`,
         { status }
+    );
+
+    return response.data;
+}
+
+export async function editBooking(
+    bookingId: number,
+    data: BookingUpdate
+): Promise<Booking> {
+    const response = await api.patch<Booking>(
+        `/bookings/${bookingId}`,
+        data
     );
 
     return response.data;

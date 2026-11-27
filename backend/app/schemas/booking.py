@@ -35,3 +35,9 @@ class BookingOut(BaseModel):
     rental: Optional[dict] = None
     owner: Optional[dict] = None
     booker: Optional[dict] = None
+
+class BookingUpdate(BaseModel):
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    guests_count: Optional[int] = Field(None, ge=1, le=500)
+    comment: Optional[str] = Field(None, max_length=1000)

@@ -1379,3 +1379,194 @@ button {
     background: #fde5e3;
     border-color: #f5b9b5;
 }
+
+.booking-edit-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+
+    width: 100%;
+    box-sizing: border-box;
+
+    margin-top: 16px;
+    padding: 24px;
+
+    background: #fffdf6;
+    border: 1px solid #eadba9;
+    border-radius: 16px;
+
+    animation: bookingFormAppear 0.2s ease;
+}
+
+.booking-edit-form h3 {
+    grid-column: 1 / -1;
+
+    margin: 0 0 4px;
+
+    color: #202020;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.booking-edit-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    color: #333333;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.booking-edit-form input,
+.booking-edit-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+
+    padding: 12px 14px;
+
+    color: #202020;
+    background: #ffffff;
+
+    border: 1px solid #d9d9d9;
+    border-radius: 9px;
+
+    font-family: inherit;
+    font-size: 14px;
+
+    outline: none;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.booking-edit-form input:hover,
+.booking-edit-form textarea:hover {
+    border-color: #c5a64a;
+}
+
+.booking-edit-form input:focus,
+.booking-edit-form textarea:focus {
+    border-color: #e4b82e;
+    box-shadow: 0 0 0 3px rgba(244, 197, 66, 0.18);
+}
+
+.booking-edit-form textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.booking-edit-form button {
+    justify-self: start;
+    min-width: 180px;
+    margin-top: 4px;
+}
+
+.booking-edit-form button[type="submit"] {
+    grid-column: 1;
+}
+
+.booking-edit-form button[type="button"] {
+    grid-column: 2;
+}
+
+.booking-edit-form button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+@keyframes bookingFormAppear {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 600px) {
+    .booking-edit-form {
+        grid-template-columns: 1fr;
+        gap: 15px;
+        padding: 18px;
+    }
+
+    .booking-edit-form h3 {
+        grid-column: 1;
+        font-size: 18px;
+    }
+
+    .booking-edit-form button,
+    .booking-edit-form button[type="submit"],
+    .booking-edit-form button[type="button"] {
+        grid-column: 1;
+        width: 100%;
+        justify-self: stretch;
+    }
+}
+
+.booking-edit-form__price {
+    grid-column: 1 / -1;
+
+    padding: 18px 20px;
+
+    background: #ffffff;
+    border: 1px solid #eadba9;
+    border-radius: 12px;
+}
+
+.booking-edit-form__price h4 {
+    margin: 0 0 14px;
+    font-size: 17px;
+    color: #202020;
+}
+
+.booking-edit-form__price p {
+    margin: 8px 0;
+    color: #555555;
+    font-size: 14px;
+}
+
+.booking-edit-form__price strong {
+    color: #202020;
+    font-size: 16px;
+}
+
+@media (max-width: 600px) {
+    .booking-edit-form__price {
+        grid-column: 1;
+    }
+}
+
+.booking-card__comment {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    margin: 8px 0;
+    padding: 14px 16px;
+
+    background: #fffdf6;
+    border: 1px solid #eadba9;
+    border-radius: 12px;
+}
+
+.booking-card__comment strong {
+    color: #333333;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.booking-card__comment p {
+    margin: 0;
+    color: #666666;
+    font-size: 14px;
+    line-height: 1.6;
+
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
