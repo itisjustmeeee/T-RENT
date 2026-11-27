@@ -54,3 +54,8 @@ export async function getCategories(): Promise<Category[]> {
 
     return response.data;
 }
+
+export const getMyRentals = async (): Promise<Rental[]> => {
+    const response = await api.get("/users/me/rentals");
+    return response.data;
+};

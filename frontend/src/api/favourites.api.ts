@@ -14,9 +14,7 @@ export const addFavorite = async (rentalId: number) => {
     return response.data;
 };
 
-export const removeFavorite = async (
-    rentalId: number
-) => {
+export const removeFavorite = async (rentalId: number) => {
     const response = await api.delete(
         `/favorites/${rentalId}`
     );

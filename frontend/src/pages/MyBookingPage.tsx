@@ -1,12 +1,9 @@
 import {
-    useCallback,
     useEffect,
     useState,
     type FormEvent,
 } from "react";
 import axios from "axios";
-
-import { useAuth } from "../context/AuthContext";
 
 import {
     getMyBookings,
@@ -17,8 +14,29 @@ import {
 
 import type { Booking } from "../types/booking.types";
 
+import { addToBlacklist } from "../api/blacklist.api";
+import { useAuth } from "../context/AuthContext";
+
+function getBookingsErrorMessage(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+        const detail = error.response?.data?.detail;
+
+        return typeof detail === "string"
+            ? detail
+            : "Не удалось загрузить бронирования";
+    }
+
+    return "Произошла непредвиденная ошибка";
+}
+
 function MyBookingsPage() {
     const { user } = useAuth();
+    const role = String(user?.role ?? "")
+        .trim()
+        .toUpperCase();
+
+    const isLessor =
+        role === "LESSOR" || role === "LESSER";
 
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
@@ -33,7 +51,10 @@ function MyBookingsPage() {
     const [editGuestsCount, setEditGuestsCount] = useState(1);
     const [editComment, setEditComment] = useState("");
 
-    const loadBookings = useCallback(async () => {
+    const [blacklistingId, setBlacklistingId] =
+        useState<number | null>(null);
+
+    const refreshBookings = async () => {
         try {
             const data = await getMyBookings();
 
@@ -41,30 +62,43 @@ function MyBookingsPage() {
             setError("");
         } catch (err) {
             console.error(err);
-
-            if (axios.isAxiosError(err)) {
-                setError(
-                    err.response?.data?.detail ||
-                    "Не удалось загрузить бронирования"
-                );
-            } else {
-                setError("Произошла непредвиденная ошибка");
-            }
-        } finally {
-            setLoading(false);
+            setError(getBookingsErrorMessage(err));
         }
-    }, []);
+    };
 
     useEffect(() => {
-        loadBookings();
-    }, [loadBookings]);
+        let active = true;
+
+        getMyBookings()
+            .then((data) => {
+                if (active) {
+                    setBookings(data);
+                    setError("");
+                }
+            })
+            .catch((err) => {
+                if (active) {
+                    console.error(err);
+                    setError(getBookingsErrorMessage(err));
+                }
+            })
+            .finally(() => {
+                if (active) {
+                    setLoading(false);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, []);
 
     const handleConfirm = async (bookingId: number) => {
         try {
             setActionLoading(bookingId);
 
             await confirmBooking(bookingId);
-            await loadBookings();
+            await refreshBookings();
         } catch (err) {
             console.error(err);
             setError("Не удалось подтвердить бронирование");
@@ -90,7 +124,7 @@ function MyBookingsPage() {
                 "CANCELLED"
             );
 
-            await loadBookings();
+            await refreshBookings();
         } catch (err) {
             console.error(err);
             setError("Не удалось отменить бронирование");
@@ -147,7 +181,7 @@ function MyBookingsPage() {
             });
 
             setEditingBookingId(null);
-            await loadBookings();
+            await refreshBookings();
         } catch (err) {
             console.error(err);
 
@@ -213,6 +247,30 @@ function MyBookingsPage() {
 
         return { total, deposit };
     }
+
+    const handleAddToBlacklist = async (renterId: number) => {
+        const confirmed = window.confirm(
+            "Добавить этого арендатора в чёрный список? " +
+            "Он не сможет создавать новые бронирования ваших помещений."
+        );
+
+        if (!confirmed) return;
+
+        try {
+            setBlacklistingId(renterId);
+
+            await addToBlacklist({
+                renter_id: renterId,
+            });
+
+            alert("Арендатор добавлен в чёрный список");
+        } catch (error) {
+            console.error(error);
+            alert("Не удалось добавить арендатора в чёрный список");
+        } finally {
+            setBlacklistingId(null);
+        }
+    };
 
     if (loading) {
         return (
@@ -334,6 +392,21 @@ function MyBookingsPage() {
                                         ? `${person.name} ${person.surname || ""}`
                                         : "Информация недоступна"}
                                 </p>
+
+                                
+                                {isOwner && isLessor && (
+                                    <button
+                                        type="button"
+                                        className="button button--danger"
+                                        onClick={() => handleAddToBlacklist(booking.booker_id)}
+                                        disabled={blacklistingId === booking.booker_id}
+                                    >
+                                        {blacklistingId === booking.booker_id
+                                            ? "Добавление..."
+                                            : "Добавить арендатора в чёрный список"}
+                                    </button>
+                                )}
+
 
                                 {isOwner && booking.status === "OPEN" && (
                                     <button

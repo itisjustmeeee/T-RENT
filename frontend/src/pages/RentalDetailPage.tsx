@@ -5,62 +5,195 @@ import { useAuth } from "../context/AuthContext";
 import { getRentalById } from "../api/rentals.api";
 import type { Rental } from "../types/rental.types";
 
+import { getFavorites, addFavorite, removeFavorite } from "../api/favourites.api";
+
+interface RentalLoadResult {
+    rentalId: string;
+    rental: Rental | null;
+    error: string;
+}
+
+interface FavoriteResult {
+    userId: number;
+    rentalId: number;
+    isFavorite: boolean;
+}
+
 function RentalDetailPage() {
     const { user } = useAuth();
     const { rentalId } = useParams<{ rentalId: string }>();
 
-    const [rental, setRental] = useState<Rental | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
+    const id = Number(rentalId);
+    const isValidRentalId =
+        Number.isSafeInteger(id) && id > 0;
+
+    const userId = user?.user_id;
+
+    const [rentalResult, setRentalResult] =
+        useState<RentalLoadResult | null>(null);
 
     const [selectedImage, setSelectedImage] = useState(0);
 
+    const [favoriteResult, setFavoriteResult] =
+        useState<FavoriteResult | null>(null);
+
+    const [favoriteLoading, setFavoriteLoading] = useState(false);
+
+    const rentalKey = rentalId ?? "";
+
+    const currentRentalResult =
+        rentalResult?.rentalId === rentalKey
+            ? rentalResult
+            : null;
+
+    const loading =
+        isValidRentalId && currentRentalResult === null;
+
+    const rental = currentRentalResult?.rental ?? null;
+
+    const error = !isValidRentalId
+        ? "Некорректный идентификатор помещения"
+        : currentRentalResult?.error ?? "";
+
+    const currentFavorite =
+        userId != null &&
+        favoriteResult?.userId === userId &&
+        favoriteResult?.rentalId === id
+            ? favoriteResult
+            : null;
+
+    const isFavorite = currentFavorite?.isFavorite ?? false;
+
+    const favoriteChecked =
+        userId == null || currentFavorite !== null;
+
     useEffect(() => {
+        if (typeof rentalId !== "string" || !isValidRentalId) {
+            return;
+        }
+
+        const currentRentalId: string = rentalId;
+        const currentId: number = id;
+
         let active = true;
 
         async function loadRental() {
-            setLoading(true);
-            setError("");
-            setRental(null);
-
-            const id = Number(rentalId);
-
-            if (!Number.isSafeInteger(id) || id <= 0) {
-                setError("Некорректный идентификатор помещения");
-                setLoading(false);
-                return;
-            }
-
             try {
-                const data = await getRentalById(id);
+                const data = await getRentalById(currentId);
 
                 if (active) {
-                    setRental(data);
+                    setRentalResult({
+                        rentalId: currentRentalId,
+                        rental: data,
+                        error: "",
+                    });
+
                     setSelectedImage(0);
                 }
             } catch (err) {
-                console.error("Ошибка загрузки помещения:", err);
+                console.error(
+                    "Ошибка загрузки помещения:",
+                    err
+                );
 
                 if (active) {
-                    setError("Не удалось загрузить помещение");
-                }
-            } finally {
-                if (active) {
-                    setLoading(false);
+                    setRentalResult({
+                        rentalId: currentRentalId,
+                        rental: null,
+                        error: "Не удалось загрузить помещение",
+                    });
                 }
             }
         }
 
-        loadRental();
+        void loadRental();
 
         return () => {
             active = false;
         };
-    }, [rentalId]);
+    }, [rentalId, id, isValidRentalId]);
+
+    useEffect(() => {
+        if (typeof userId !== "number" || !isValidRentalId) {
+            return;
+        }
+
+        const currentUserId: number = userId;
+        const currentRentalId: number = id;
+
+        let active = true;
+
+        async function checkFavorite() {
+            try {
+                const favorites = await getFavorites();
+
+                if (active) {
+                    setFavoriteResult({
+                        userId: currentUserId,
+                        rentalId: currentRentalId,
+                        isFavorite: favorites.some(
+                            (item) => item.rental_id === currentRentalId
+                        ),
+                    });
+                }
+            } catch (err) {
+                console.error(
+                    "Не удалось проверить избранное:",
+                    err
+                );
+
+                if (active) {
+                    setFavoriteResult({
+                        userId: currentUserId,
+                        rentalId: currentRentalId,
+                        isFavorite: false,
+                    });
+                }
+            }
+        }
+
+        void checkFavorite();
+
+        return () => {
+            active = false;
+        };
+    }, [userId, rentalId, id, isValidRentalId]);
+
+    const handleFavorite = async () => {
+        if (typeof userId !== "number" || !rental) {
+            return;
+        }
+
+        const currentUserId: number = userId;
+        const currentRentalId: number = rental.rental_id;
+
+        try {
+            setFavoriteLoading(true);
+
+            const nextFavorite = !isFavorite;
+
+            if (isFavorite) {
+                await removeFavorite(currentRentalId);
+            } else {
+                await addFavorite(currentRentalId);
+            }
+
+            setFavoriteResult({
+                userId: currentUserId,
+                rentalId: currentRentalId,
+                isFavorite: nextFavorite,
+            });
+        } catch (err) {
+            console.error("Ошибка избранного:", err);
+            alert("Не удалось изменить избранное");
+        } finally {
+            setFavoriteLoading(false);
+        }
+    };
 
     if (loading) {
         return (
-            <main className="container rental-detail__message">
+            <main className="page container rental-detail__message">
                 Загрузка помещения...
             </main>
         );
@@ -68,7 +201,7 @@ function RentalDetailPage() {
 
     if (error || !rental) {
         return (
-            <main className="container rental-detail__message">
+            <main className="page container rental-detail__message">
                 <h2>{error || "Помещение не найдено"}</h2>
 
                 <Link to="/rentals" className="button button--primary">
@@ -213,6 +346,28 @@ function RentalDetailPage() {
                 </div>
                 <aside className="rental-detail__sidebar">
                     <div className="rental-booking">
+                        {user && (
+                            <button
+                                type="button"
+                                className={`favorite-button ${
+                                    isFavorite ? "favorite-button--active" : ""
+                                }`}
+                                onClick={handleFavorite}
+                                disabled={favoriteLoading || !favoriteChecked}
+                            >
+                                <span>
+                                    {isFavorite ? "♥" : "♡"}
+                                </span>
+
+                                {favoriteLoading
+                                    ? "Обновление..."
+                                    : !favoriteChecked
+                                        ? "Проверка избранного..."
+                                        : isFavorite
+                                            ? "В избранном"
+                                            : "Добавить в избранное"}
+                            </button>
+                        )}
                         <span className="rental-booking__label">
                             Стоимость аренды
                         </span>

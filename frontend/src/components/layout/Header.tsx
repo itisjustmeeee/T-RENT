@@ -1,80 +1,126 @@
+
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 function Header() {
     const navigate = useNavigate();
+
     const { user, isAuthenticated, logout } = useAuth();
 
+    const role = String(user?.role ?? "");
+
+    const isRenter = role === "RENTER";
+    const isLessor =
+        role === "LESSOR" || role === "LESSER";
+
+    const getNavClass = ({
+        isActive,
+    }: {
+        isActive: boolean;
+    }) =>
+        isActive
+            ? "nav-link active"
+            : "nav-link";
+
     const handleLogout = async () => {
-        await logout();
-        navigate("/", {replace: true});
+        try {
+            await logout();
+            navigate("/", { replace: true });
+        } catch (error) {
+            console.error("Ошибка выхода из аккаунта:", error);
+        }
     };
 
     return (
         <header className="site-header">
             <div className="container header__inner">
+
                 <Link to="/" className="header__logo">
                     T-RENT
                 </Link>
 
                 <nav className="header__nav">
+
                     <NavLink
                         to="/rentals"
-                        className={({ isActive }) =>
-                            isActive ? "nav-link active" : "nav-link"
-                        }
+                        className={getNavClass}
                     >
                         Каталог
                     </NavLink>
 
-                    {isAuthenticated ? (
-                        <NavLink
-                            to="/profile"
-                            className={({ isActive }) =>
-                                isActive
-                                    ? "nav-link active"
-                                    : "nav-link"
-                            }
-                        >
-                            Профиль
-                        </NavLink>
-                    ) : (
+                    {isAuthenticated && (
+                        <>
+                            <NavLink
+                                to="/favorites"
+                                className={getNavClass}
+                            >
+                                Избранное
+                            </NavLink>
+
+                            <NavLink
+                                to="/notifications"
+                                className={getNavClass}
+                            >
+                                Уведомления
+                            </NavLink>
+
+                            
+                            {(isRenter || isLessor) && (
+                                <NavLink
+                                    to="/bookings"
+                                    className={getNavClass}
+                                >
+                                    {isRenter ? "Мои бронирования" : "Заявки на аренду"}
+                                </NavLink>
+                            )}
+
+
+                            {isLessor && (
+                                <>
+                                    <NavLink
+                                        to="/my-rentals"
+                                        className={getNavClass}
+                                    >
+                                        Мои объявления
+                                    </NavLink>
+
+                                    <NavLink
+                                        to="/blacklist"
+                                        className={getNavClass}
+                                    >
+                                        Чёрный список
+                                    </NavLink>
+                                </>
+                            )}
+
+                            <NavLink
+                                to="/profile"
+                                className={getNavClass}
+                            >
+                                Профиль
+                            </NavLink>
+                        </>
+                    )}
+
+                    {!isAuthenticated && (
                         <NavLink
                             to="/login"
-                            className={({ isActive }) =>
-                                isActive
-                                    ? "nav-link active"
-                                    : "nav-link"
-                            }
+                            className={getNavClass}
                         >
                             Профиль
                         </NavLink>
                     )}
 
-                    {isAuthenticated && (
-                        <NavLink
-                            to="/bookings"
-                            className={({ isActive }) =>
-                                isActive ? "nav-link active" : "nav-link"
-                            }
-                        >
-                            Мои бронирования
-                        </NavLink>
-                    )}
-
-                    <span className="nav-link nav-link--disabled">
-                        Избранное
-                    </span>
-
-                    <span className="nav-link nav-link--disabled">
-                        Уведомления
-                    </span>
                 </nav>
+
                 {isAuthenticated ? (
                     <div className="header__account">
+
                         <span className="header__user-name">
                             {user
-                                ? [user.name, user.surname].filter(Boolean).join(" ")
+                                ? [user.name, user.surname]
+                                    .filter(Boolean)
+                                    .join(" ")
                                 : ""}
                         </span>
 
@@ -85,9 +131,11 @@ function Header() {
                         >
                             Выйти
                         </button>
+
                     </div>
                 ) : (
                     <div className="header__account">
+
                         <Link
                             to="/register"
                             className="button button--secondary"
@@ -101,8 +149,10 @@ function Header() {
                         >
                             Войти
                         </Link>
+
                     </div>
                 )}
+
             </div>
         </header>
     );

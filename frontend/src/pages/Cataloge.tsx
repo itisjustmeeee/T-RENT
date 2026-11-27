@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -5,6 +6,14 @@ import axios from "axios";
 import Hero from "../components/rentals/Hero";
 import CategoryFilter from "../components/rentals/CategoryFilter";
 import { RentalCard } from "../components/rentals/RentalCard";
+
+import { useAuth } from "../context/AuthContext";
+
+import {
+    getFavorites,
+    addFavorite,
+    removeFavorite,
+} from "../api/favourites.api";
 
 import {
     getRentals,
@@ -16,9 +25,13 @@ import type {
     Category,
 } from "../types/rental.types";
 
-import type { RentalFilters } from "../api/rentals.api";
+import type {
+    RentalFilters,
+} from "../api/rentals.api";
 
 const PAGE_SIZE = 9;
+
+const EMPTY_FAVORITE_IDS: ReadonlySet<number> = new Set<number>();
 
 function CatalogPage() {
     const navigate = useNavigate();
@@ -49,6 +62,20 @@ function CatalogPage() {
 
     const [total, setTotal] = useState(0);
 
+    const { user } = useAuth();
+
+    const userId = user?.user_id;
+
+    const [favoriteData, setFavoriteData] = useState<{
+        userId: number;
+        ids: Set<number>;
+    } | null>(null);
+
+    const favoriteIds =
+        favoriteData && favoriteData.userId === userId
+            ? favoriteData.ids
+            : EMPTY_FAVORITE_IDS;
+
     const currentPage =
         Math.floor((filters.skip ?? 0) / PAGE_SIZE) + 1;
 
@@ -63,11 +90,14 @@ function CatalogPage() {
                     setCategories(data);
                 }
             } catch (err) {
-                console.error("Ошибка загрузки категорий:", err);
+                console.error(
+                    "Ошибка загрузки категорий:",
+                    err
+                );
             }
         }
 
-        loadCategories();
+        void loadCategories();
 
         return () => {
             active = false;
@@ -93,7 +123,10 @@ function CatalogPage() {
                     );
                 }
             } catch (err) {
-                console.error("Ошибка загрузки объявлений:", err);
+                console.error(
+                    "Ошибка загрузки объявлений:",
+                    err
+                );
 
                 if (active) {
                     setRentals([]);
@@ -109,7 +142,9 @@ function CatalogPage() {
                                 : "Не удалось загрузить помещения. Проверьте сервер."
                         );
                     } else {
-                        setError("Произошла непредвиденная ошибка.");
+                        setError(
+                            "Произошла непредвиденная ошибка."
+                        );
                     }
                 }
             } finally {
@@ -119,7 +154,7 @@ function CatalogPage() {
             }
         }
 
-        loadRentals();
+        void loadRentals();
 
         return () => {
             active = false;
@@ -195,6 +230,102 @@ function CatalogPage() {
             min_price: min,
             max_price: max,
         });
+    };
+
+    useEffect(() => {
+        if (typeof userId !== "number") {
+            return;
+        }
+
+        let active = true;
+
+        const currentUserId: number = userId;
+
+        async function loadFavoriteIds() {
+            try {
+                const data = await getFavorites();
+
+                if (active) {
+                    setFavoriteData({
+                        userId: currentUserId,
+                        ids: new Set<number>(
+                            data.map((item) => item.rental_id)
+                        ),
+                    });
+                }
+            } catch (err) {
+                console.error(
+                    "Ошибка загрузки избранного:",
+                    err
+                );
+            }
+        }
+
+        void loadFavoriteIds();
+
+        return () => {
+            active = false;
+        };
+    }, [userId]);
+
+    const handleToggleFavorite = async (rentalId: number) => {
+        const currentUserId = userId;
+
+        if (currentUserId == null) {
+            navigate("/login", {
+                state: { from: "/rentals" },
+            });
+            return;
+        }
+
+        const alreadyFavorite = favoriteIds.has(rentalId);
+
+        try {
+            if (alreadyFavorite) {
+                await removeFavorite(rentalId);
+
+                setFavoriteData((previous) => {
+                    const next = new Set<number>(
+                        previous &&
+                        previous.userId === currentUserId
+                            ? previous.ids
+                            : []
+                    );
+
+                    next.delete(rentalId);
+
+                    return {
+                        userId: currentUserId,
+                        ids: next,
+                    };
+                });
+            } else {
+                await addFavorite(rentalId);
+
+                setFavoriteData((previous) => {
+                    const next = new Set<number>(
+                        previous &&
+                        previous.userId === currentUserId
+                            ? previous.ids
+                            : []
+                    );
+
+                    next.add(rentalId);
+
+                    return {
+                        userId: currentUserId,
+                        ids: next,
+                    };
+                });
+            }
+        } catch (err) {
+            console.error(
+                "Ошибка избранного:",
+                err
+            );
+
+            alert("Не удалось изменить избранное");
+        }
     };
 
     const resetFilters = () => {
@@ -278,7 +409,9 @@ function CatalogPage() {
                             onChange={(e) =>
                                 updateFilters({
                                     sort_by: e.target.value as
-                                        "newest" | "price_asc" | "price_desc",
+                                        | "newest"
+                                        | "price_asc"
+                                        | "price_desc",
                                 })
                             }
                         >
@@ -368,6 +501,12 @@ function CatalogPage() {
                                                 `/rentals/${rental.rental_id}`
                                             )
                                         }
+                                        isFavorite={favoriteIds.has(
+                                            rental.rental_id
+                                        )}
+                                        onToggleFavorite={
+                                            handleToggleFavorite
+                                        }
                                     />
                                 ))}
                             </div>
@@ -429,7 +568,7 @@ function CatalogPage() {
                     </p>
                 </div>
 
-               <button
+                <button
                     type="button"
                     className="button button--primary"
                     onClick={() =>
