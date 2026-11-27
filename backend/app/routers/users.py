@@ -71,10 +71,35 @@ async def add_to_blacklist(body: BlackListCreate, user: User = Depends(require_l
     if not renter:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-    if body.fine_id is not None:
-        fine = await db.fine.find_unique(where={"fine_id": body.fine_id})
+    # amount <= 0 отсекается Pydantic (ValueError → 422). Доп. защита:
+    if body.amount is not None and body.amount <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Сумма штрафа (amount) должна быть больше 0",
+        )
+
+    fine_id = body.fine_id
+    if fine_id is not None:
+        fine = await db.fine.find_unique(where={"fine_id": fine_id})
         if not fine:
             raise HTTPException(status_code=400, detail="Штраф с таким fine_id не найден")
+
+    # Если передали amount без fine_id — создаём Fine
+    if body.amount is not None and fine_id is None:
+        import uuid
+        try:
+            fine = await db.fine.create(
+                data={
+                    "fine_number": f"FINE-{uuid.uuid4().hex[:10].upper()}",
+                    "amount": body.amount,
+                }
+            )
+            fine_id = fine.fine_id
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Не удалось создать штраф: {str(e)[:200]}",
+            )
 
     existing = await db.blacklist.find_first(
         where={"lesser_id": user.user_id, "renter_id": body.renter_id, "is_closed": False}
@@ -87,7 +112,7 @@ async def add_to_blacklist(body: BlackListCreate, user: User = Depends(require_l
             data={
                 "lesser_id": user.user_id,
                 "renter_id": body.renter_id,
-                "fine_id": body.fine_id,
+                "fine_id": fine_id,
             },
             include={"renter": True},
         )

@@ -135,27 +135,39 @@ async def get_rental(
 
 @router.post("/api/rentals", status_code=201)
 async def create_rental(body: RentalCreate, user: User = Depends(require_lesser)):
-    if body.category_id:
+    # category_id=0 / отрицательный / несуществующий → 400, не 500
+    if body.category_id is not None:
+        if body.category_id <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный category_id")
         cat = await db.category.find_unique(where={"category_id": body.category_id})
         if not cat:
             raise HTTPException(status_code=400, detail="Категория не найдена")
 
-    rental = await db.rental.create(
-        data={
-            "owner_id": user.user_id,
-            "title": body.title,
-            "address": body.address,
-            "area": body.area,
-            "price": body.price,
-            "time_measurement": body.time_measurement,
-            "category_id": body.category_id,
-            "desc": body.desc,
-            "amount_of_people": body.amount_of_people,
-            "photo_url": body.photo_url,
-            "availability": body.availability,
-        },
-        include={"category": True, "photos": True},
-    )
+    data = {
+        "owner_id": user.user_id,
+        "title": body.title,
+        "address": body.address,
+        "area": body.area,
+        "price": body.price,
+        "time_measurement": body.time_measurement,
+        "desc": body.desc,
+        "amount_of_people": body.amount_of_people,
+        "photo_url": body.photo_url,
+        "availability": body.availability,
+    }
+    if body.category_id is not None:
+        data["category_id"] = body.category_id
+
+    try:
+        rental = await db.rental.create(
+            data=data,
+            include={"category": True, "photos": True},
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Не удалось создать объявление: {str(e)[:250]}",
+        )
     return rental
 
 
@@ -174,16 +186,24 @@ async def update_rental(
     data = body.model_dump(exclude_unset=True)
     if not data:
         return rental
-    if "category_id" in data and data["category_id"]:
+    if "category_id" in data and data["category_id"] is not None:
+        if data["category_id"] <= 0:
+            raise HTTPException(status_code=400, detail="Некорректный category_id")
         cat = await db.category.find_unique(where={"category_id": data["category_id"]})
         if not cat:
             raise HTTPException(status_code=400, detail="Категория не найдена")
 
-    updated = await db.rental.update(
-        where={"rental_id": rental_id},
-        data=data,
-        include={"category": True, "photos": True},
-    )
+    try:
+        updated = await db.rental.update(
+            where={"rental_id": rental_id},
+            data=data,
+            include={"category": True, "photos": True},
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Не удалось обновить объявление: {str(e)[:250]}",
+        )
     return updated
 
 
@@ -234,34 +254,75 @@ async def delete_rental(rental_id: int, user: User = Depends(require_lesser)):
 @router.get("/api/rentals/{rental_id}/calendar")
 async def get_rental_calendar(
     rental_id: int,
-    from_date: Optional[datetime] = None,
-    to_date: Optional[datetime] = None,
+    from_date: Optional[str] = Query(
+        None,
+        description="Начало периода (ISO): 2026-12-01 или 2026-12-01T00:00:00",
+    ),
+    to_date: Optional[str] = Query(
+        None,
+        description="Конец периода (ISO): 2026-12-31 или 2026-12-31T23:59:59",
+    ),
 ):
-    """Календарь занятых слотов объявления."""
+    """Календарь занятых слотов. Даты опциональны; при ошибке формата — 400, не 500."""
     rental = await db.rental.find_unique(where={"rental_id": rental_id})
     if not rental:
         raise HTTPException(status_code=404, detail="Объявление не найдено")
 
-    if from_date and to_date and to_date < from_date:
+    def _parse_dt(value: Optional[str], field_name: str) -> Optional[datetime]:
+        if value is None or str(value).strip() == "":
+            return None
+        raw = str(value).strip().replace("Z", "+00:00")
+        # дата без времени
+        if len(raw) == 10 and raw[4] == "-" and raw[7] == "-":
+            raw = raw + "T00:00:00"
+        try:
+            dt = datetime.fromisoformat(raw)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Некорректный формат {field_name}: «{value}». "
+                    "Ожидается ISO-дата, например 2026-12-01 или 2026-12-01T14:00:00"
+                ),
+            )
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+
+    start = _parse_dt(from_date, "from_date")
+    end = _parse_dt(to_date, "to_date")
+    if start is not None and end is not None and end < start:
         raise HTTPException(
             status_code=400,
             detail="to_date должна быть не раньше from_date",
         )
 
-    # Простая фильтрация: все активные брони, затем при необходимости режем по датам в Python
-    bookings = await db.booking.find_many(
-        where={
-            "rental_id": rental_id,
-            "status": {"in": ["OPEN", "CONFIRMED"]},
-        },
-        order={"start_date": "asc"},
-    )
+    try:
+        bookings = await db.booking.find_many(
+            where={
+                "rental_id": rental_id,
+                "status": {"in": ["OPEN", "CONFIRMED"]},
+            },
+            order={"start_date": "asc"},
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Не удалось получить слоты: {str(e)[:200]}",
+        )
 
     slots = []
     for b in bookings:
-        if from_date is not None and b.end_date < from_date:
+        b_start = b.start_date
+        b_end = b.end_date
+        # сравниваем naive
+        if getattr(b_start, "tzinfo", None) is not None:
+            b_start = b_start.replace(tzinfo=None)
+        if getattr(b_end, "tzinfo", None) is not None:
+            b_end = b_end.replace(tzinfo=None)
+        if start is not None and b_end < start:
             continue
-        if to_date is not None and b.start_date > to_date:
+        if end is not None and b_start > end:
             continue
         slots.append(
             {
@@ -275,8 +336,12 @@ async def get_rental_calendar(
     return {
         "rental_id": rental_id,
         "availability": str(rental.availability),
+        "from_date": start,
+        "to_date": end,
         "booked_slots": slots,
     }
+
+
 
 
 # ---------- Reviews ----------
