@@ -1,75 +1,69 @@
-# React + TypeScript + Vite
+# Папка для фронтенда
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Необходимые вещи перед запуском
 
-Currently, two official plugins are available:
+Необходимо установить (если не установлено):
+- Node.js и npm
+- Visual Studio Code
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+После установки рекомендуется проверить версии скачанных компонентов:
+```bash
+node -v
+npm -v
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+## Структура проекта
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+T-RENT/
+|
+├──backend/ (папка с backend проекта)
+|
+├──frontend/
+|  ├──public
+|  ├──src/ (папка с основными компонентами)
+|  |  ├──api/ (папка с файлами для взаимодействия с backend)
+|  |  ├──components/ (папка с компонентами для frontend)
+|  |  |  ├──layout/ (папка с шапкой сайта)
+|  |  |  ├──rentals/ (папка с карточками, фильтром и посиком)
+|  |  ├──context/ (папка с контекстом для аутентификации)
+|  |  ├──layouts/ (папка с основным layout для проекта)
+|  |  ├──pages/ (папка со страницами проекта)
+|  |  ├──styles/ (папка со стилями для проекта)
+|  |  ├──types/ (папка с типами данных для основных сущностей проекта)
+|  |  ├──App.tsx
+|  |  ├──main.tsx
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Запуск проекта
 
+1. В папке проекта перейдите в папку frontend
+```bash
+cd frontend
 ```
+2. Установите зависимоти
+```bash
+npm ci
+```
+(если отсутствует package-lock.json:
+```bash
+npm install
+```
+)
+3. Создайте файл `.env` в frontend и заполните его в соответствии с .env.example
+```env
+VITE_API_URL=http://localhost:8000/api
+```
+4. Запустите frontend
+```bash
+npm run dev
+```
+5. Если все прошло нормально, перейдите по появившейся ссылке
+
+## Дополнительно
+
+Рекомендуется проверять нет ли ошибок.<br>
+Вы можете сделать это с помощью команды:
+```bash
+npm run build
+```
+
+Также перед запуском frontend стоит запускать backend

@@ -136,7 +136,24 @@ async def get_my_rentals(user: User = Depends(require_lesser)):
         include={"category": True, "photos": True},
         order={"created_at": "desc"},
     )
-    return rentals
+
+    result = []
+
+    for rental in rentals:
+        data = rental.model_dump()
+
+        active_bookings_count = await db.booking.count(
+            where={
+                "rental_id": rental.rental_id,
+                "status": {"in": ["OPEN", "CONFIRMED"]},
+            }
+        )
+
+        data["active_bookings_count"] = active_bookings_count
+
+        result.append(data)
+
+    return result
 
 
 @router.get("/me/bookings")

@@ -29,6 +29,19 @@ export interface RentalListResponse {
     take: number;
 }
 
+export interface CreateRentalPayload {
+    title: string;
+    address: string;
+    area: number;
+    price: number;
+    time_measurement: "HOUR" | "DAY" | "MONTH";
+    category_id?: number;
+    desc: string;
+    amount_of_people: number;
+    photo_url?: string;
+    availability: string;
+}
+
 export async function getRentals(
     filters: RentalFilters = {}
 ): Promise<RentalListResponse> {
@@ -58,4 +71,17 @@ export async function getCategories(): Promise<Category[]> {
 export const getMyRentals = async (): Promise<Rental[]> => {
     const response = await api.get("/users/me/rentals");
     return response.data;
+};
+
+export const createRental = async (
+    data: CreateRentalPayload
+): Promise<Rental> => {
+    const response = await api.post("/rentals", data);
+    return response.data;
+};
+
+export const deleteRental = async (
+    rentalId: number
+): Promise<void> => {
+    await api.delete(`/rentals/${rentalId}`);
 };

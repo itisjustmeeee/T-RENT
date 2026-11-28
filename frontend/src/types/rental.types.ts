@@ -44,6 +44,7 @@ export interface Rental {
 
     avg_rating?: number | null;
     reviews_count?: number;
+    active_bookings_count?: number;
 }
 
 export interface RentalListResponse {

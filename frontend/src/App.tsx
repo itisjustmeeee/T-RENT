@@ -16,6 +16,7 @@ import MyRentalsPage from "./pages/MyRentalsPage";
 import FavoritesPage from "./pages/FavouritesPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import BlacklistPage from "./pages/BlackListPage";
+import CreateRentalPage from "./pages/CreateRentalPage";
 
 import { useAuth } from "./context/AuthContext";
 
@@ -142,6 +143,20 @@ function App() {
                                     />
                                 )
                         }
+                    />
+
+                    <Route
+                      path="/my-rentals/create"
+                      element={
+                        isAuthenticated && isLessor
+                          ? <CreateRentalPage />
+                          : (
+                            <Navigate
+                              to={isAuthenticated ? "/" : "/login"}
+                              replace
+                            />
+                          )
+                      }
                     />
 
                     <Route
